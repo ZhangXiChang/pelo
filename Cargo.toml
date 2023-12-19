@@ -6,14 +6,18 @@ edition = "2021"
 [dependencies]
 #人机交互
 crossterm = "0.27.0"
-ratatui = "0.24.0"
+ratatui = "0.25.0"
 
 #性能
-tokio = { version = "1.34.0", features = ["full"] }
+tokio = { version = "1.35.0", features = ["full"] }
 
 #网络
-reqwest = { version = "0.11.22", features = ["json"] }
+reqwest = { version = "0.11.23", features = ["json"] }
 
 #数据处理
 regex = "1.10.2"
 image = "0.24.7"
+
+#调试
+log = "0.4.20"
+log4rs = "1.2.0"

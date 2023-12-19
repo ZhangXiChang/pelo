@@ -1,9 +1,16 @@
-use std::{fs, io};
+use std::{fs, io, time};
 
 use crossterm::{
-    event::{self, KeyCode, KeyEventKind},
+    event::{self, poll, Event, KeyCode, KeyEventKind},
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
+};
+use log::{error, info, LevelFilter};
+use log4rs::{
+    append::file::FileAppender,
+    config::{Appender, Root},
+    encode::pattern::PatternEncoder,
+    Config,
 };
 use ratatui::{
     prelude::*,
@@ -24,7 +31,6 @@ struct ImagePoints {
     height: f64,
     points: Vec<(f64, f64)>,
 }
-
 struct App<'a> {
     pub is_run: bool,
     pub menu_state: MenuState,
@@ -36,6 +42,7 @@ struct App<'a> {
     pub kbn_points: Option<ImagePoints>,
     pub deck_dir_file_name: Vec<String>,
 }
+
 impl<'a> App<'a> {
     fn new() -> Self {
         Self {
@@ -53,9 +60,51 @@ impl<'a> App<'a> {
 }
 
 fn main() {
-    io::stdout().execute(EnterAlternateScreen).unwrap();
-    enable_raw_mode().unwrap();
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout())).unwrap();
+    match FileAppender::builder()
+        .encoder(Box::new(PatternEncoder::new(
+            "[{d(%Y-%m-%d %H:%M:%S)}][{l}]:{m}{n}",
+        )))
+        .build("./logs/latest.log")
+    {
+        Ok(fa) => {
+            match Config::builder()
+                .appender(Appender::builder().build("file", Box::new(fa)))
+                .build(Root::builder().appender("file").build(LevelFilter::Info))
+            {
+                Ok(c) => match log4rs::init_config(c) {
+                    Ok(_) => println!("初始化日志系统成功"),
+                    Err(e) => {
+                        println!("{}", e);
+                        return;
+                    }
+                },
+                Err(e) => {
+                    println!("{}", e);
+                    return;
+                }
+            }
+        }
+        Err(e) => {
+            println!("{}", e);
+            return;
+        }
+    }
+
+    match io::stdout().execute(EnterAlternateScreen) {
+        Ok(_) => info!("执行切换到终端备用屏幕的命令成功"),
+        Err(e) => {
+            error!("执行切换到终端备用屏幕的命令失败，返回的错误信息：{}", e);
+            return;
+        }
+    }
+    match enable_raw_mode() {
+        Ok(_) => info!("开启终端原始模式成功"),
+        Err(e) => {
+            error!("开启终端原始模式失败，返回的错误信息：{}", e);
+            return;
+        }
+    }
+
     let mut app = App::new();
     app.main_menu_options_state.select(Some(0));
     app.side_menu_options_state.select(Some(0));
@@ -74,80 +123,138 @@ fn main() {
                 points,
             })
         }
-        Err(_) => None,
+        _ => None,
     };
-    while app.is_run {
-        //主菜单
-        app.main_menu_options = match app.main_menu_state {
-            MainMenuState::RootMenu => vec![
-                ListItem::new("让我康康你的卡组"),
-                ListItem::new("退出牌佬助手"),
-            ],
-            MainMenuState::DeckSelectMenu => vec![ListItem::new("返回")],
-        };
-        //副菜单
-        app.deck_dir_file_name = match fs::read_dir("./assets/deck") {
-            Ok(entrys) => {
-                let mut dir_file_name = vec![];
-                for entry in entrys {
-                    let metadata = fs::metadata(entry.as_ref().unwrap().path()).unwrap();
-                    if metadata.is_file() {
-                        dir_file_name
-                            .push(entry.unwrap().file_name().to_str().unwrap().to_string());
+
+    match Terminal::new(CrosstermBackend::new(io::stdout())) {
+        Ok(mut t) => {
+            info!("实例化终端UI绘制对象成功");
+            while app.is_run {
+                //主菜单
+                app.main_menu_options = match app.main_menu_state {
+                    MainMenuState::RootMenu => vec![
+                        ListItem::new("让我康康你的卡组"),
+                        ListItem::new("退出牌佬助手"),
+                    ],
+                    MainMenuState::DeckSelectMenu => vec![ListItem::new("返回")],
+                };
+                //副菜单
+                app.deck_dir_file_name = match fs::read_dir("./assets/deck") {
+                    Ok(entrys) => {
+                        let mut file_name_list = vec![];
+                        for entry_res in entrys {
+                            match entry_res {
+                                Ok(de) => match fs::metadata(de.path()) {
+                                    Ok(m) => {
+                                        if m.is_file() {
+                                            if let Some(file_name) = de.file_name().to_str() {
+                                                file_name_list.push(file_name.to_string());
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        error!("读取元数据失败，返回的错误信息：{}", e);
+                                        app.is_run = false;
+                                    }
+                                },
+                                Err(e) => {
+                                    error!("读取目录条目失败，返回的错误信息：{}", e);
+                                    app.is_run = false;
+                                }
+                            }
+                        }
+                        file_name_list
                     }
+                    _ => vec![],
+                };
+                app.side_menu_options = match app.main_menu_state {
+                    MainMenuState::DeckSelectMenu => {
+                        let mut options = vec![];
+                        for file_name in app.deck_dir_file_name.clone() {
+                            options.push(ListItem::new(file_name));
+                        }
+                        options
+                    }
+                    _ => vec![],
+                };
+                match input_process(&mut app) {
+                    Err(e) => {
+                        error!("输入处理出错，返回的错误信息：{}", e);
+                        app.is_run = false;
+                    }
+                    _ => (),
                 }
-                dir_file_name
-            }
-            Err(_) => vec![],
-        };
-        app.side_menu_options = match app.main_menu_state {
-            MainMenuState::DeckSelectMenu => {
-                let mut options = vec![];
-                for file_name in app.deck_dir_file_name.clone() {
-                    options.push(ListItem::new(file_name));
+                match t.draw(|frame| {
+                    draw(frame, &mut app);
+                }) {
+                    Err(e) => {
+                        error!("绘制终端UI失败，返回的错误信息：{}", e);
+                        app.is_run = false;
+                    }
+                    _ => (),
                 }
-                options
             }
-            _ => vec![],
-        };
-        input_process(&mut app);
-        terminal
-            .draw(|frame| {
-                draw(frame, &mut app);
-            })
-            .unwrap();
+        }
+        Err(e) => {
+            error!("实例化终端UI绘制对象失败，返回的错误信息：{}", e);
+            return;
+        }
     }
-    io::stdout().execute(LeaveAlternateScreen).unwrap();
-    disable_raw_mode().unwrap();
+    match io::stdout().execute(LeaveAlternateScreen) {
+        Ok(_) => info!("执行切换回终端主屏幕的命令成功"),
+        Err(e) => {
+            error!("执行切换回终端主屏幕的命令失败，返回的错误信息：{}", e);
+            return;
+        }
+    }
+    match disable_raw_mode() {
+        Ok(_) => info!("关闭终端原始模式成功"),
+        Err(e) => {
+            error!("关闭终端原始模式失败，返回的错误信息：{}", e);
+            return;
+        }
+    }
 }
-fn input_process(app: &mut App) {
-    if event::poll(std::time::Duration::from_millis(10)).unwrap() {
-        if let event::Event::Key(key) = event::read().unwrap() {
-            if key.kind == KeyEventKind::Press {
-                match key.code {
+fn input_process(app: &mut App) -> io::Result<()> {
+    if poll(time::Duration::from_millis(0))? {
+        match event::read()? {
+            Event::Key(key) => match key.kind {
+                KeyEventKind::Press => match key.code {
                     KeyCode::Up => match app.menu_state {
-                        MenuState::MainMenu => app.main_menu_options_state.select(Some(
-                            (app.main_menu_options_state.selected().unwrap() as i64 - 1)
-                                .clamp(0, app.main_menu_options.len() as i64 - 1)
-                                as usize,
-                        )),
-                        MenuState::SideMenu => app.side_menu_options_state.select(Some(
-                            (app.side_menu_options_state.selected().unwrap() as i64 - 1)
-                                .clamp(0, app.side_menu_options.len() as i64 - 1)
-                                as usize,
-                        )),
+                        MenuState::MainMenu => {
+                            if let Some(i) = app.main_menu_options_state.selected() {
+                                app.main_menu_options_state.select(Some(
+                                    (i as i64 - 1).clamp(0, app.main_menu_options.len() as i64 - 1)
+                                        as usize,
+                                ))
+                            }
+                        }
+                        MenuState::SideMenu => {
+                            if let Some(i) = app.side_menu_options_state.selected() {
+                                app.side_menu_options_state.select(Some(
+                                    (i as i64 - 1).clamp(0, app.main_menu_options.len() as i64 - 1)
+                                        as usize,
+                                ))
+                            }
+                        }
                     },
                     KeyCode::Down => match app.menu_state {
-                        MenuState::MainMenu => app.main_menu_options_state.select(Some(
-                            (app.main_menu_options_state.selected().unwrap() as i64 + 1)
-                                .clamp(0, app.main_menu_options.len() as i64 - 1)
-                                as usize,
-                        )),
-                        MenuState::SideMenu => app.side_menu_options_state.select(Some(
-                            (app.side_menu_options_state.selected().unwrap() as i64 + 1)
-                                .clamp(0, app.side_menu_options.len() as i64 - 1)
-                                as usize,
-                        )),
+                        MenuState::MainMenu => {
+                            if let Some(i) = app.main_menu_options_state.selected() {
+                                app.main_menu_options_state.select(Some(
+                                    (i as i64 + 1).clamp(0, app.main_menu_options.len() as i64 - 1)
+                                        as usize,
+                                ))
+                            }
+                        }
+                        MenuState::SideMenu => {
+                            if let Some(i) = app.side_menu_options_state.selected() {
+                                app.side_menu_options_state.select(Some(
+                                    (i as i64 + 1).clamp(0, app.main_menu_options.len() as i64 - 1)
+                                        as usize,
+                                ))
+                            }
+                        }
                     },
                     KeyCode::Tab => match app.menu_state {
                         MenuState::MainMenu => app.menu_state = MenuState::SideMenu,
@@ -156,19 +263,23 @@ fn input_process(app: &mut App) {
                     KeyCode::Enter => match app.menu_state {
                         MenuState::MainMenu => match app.main_menu_state {
                             MainMenuState::RootMenu => {
-                                match app.main_menu_options_state.selected().unwrap() {
-                                    0 => {
-                                        app.main_menu_state = MainMenuState::DeckSelectMenu;
-                                        app.menu_state = MenuState::SideMenu;
+                                if let Some(i) = app.main_menu_options_state.selected() {
+                                    match i {
+                                        0 => {
+                                            app.main_menu_state = MainMenuState::DeckSelectMenu;
+                                            app.menu_state = MenuState::SideMenu;
+                                        }
+                                        1 => app.is_run = false,
+                                        _ => (),
                                     }
-                                    1 => app.is_run = false,
-                                    _ => (),
                                 }
                             }
                             MainMenuState::DeckSelectMenu => {
-                                match app.main_menu_options_state.selected().unwrap() {
-                                    0 => app.main_menu_state = MainMenuState::RootMenu,
-                                    _ => (),
+                                if let Some(i) = app.main_menu_options_state.selected() {
+                                    match i {
+                                        0 => app.main_menu_state = MainMenuState::RootMenu,
+                                        _ => (),
+                                    }
                                 }
                             }
                         },
@@ -177,16 +288,20 @@ fn input_process(app: &mut App) {
                         }
                     },
                     _ => (),
-                }
-            }
+                },
+                _ => (),
+            },
+            _ => (),
         }
     }
+    Ok(())
 }
 fn draw(frame: &mut Frame, app: &mut App) {
-    let main_layout = Layout::new()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Length(3), Constraint::Min(0)])
-        .split(frame.size());
+    let main_layout = Layout::new(
+        Direction::Vertical,
+        [Constraint::Length(3), Constraint::Min(0)],
+    )
+    .split(frame.size());
     {
         frame.render_widget(
             Paragraph::new("牌佬助手")
@@ -195,14 +310,15 @@ fn draw(frame: &mut Frame, app: &mut App) {
                 .add_modifier(Modifier::BOLD),
             main_layout[0],
         );
-        let content_layout = Layout::new()
-            .direction(Direction::Horizontal)
-            .constraints([
+        let content_layout = Layout::new(
+            Direction::Horizontal,
+            [
                 Constraint::Length(21),
                 Constraint::Min(0),
                 Constraint::Max(main_layout[1].height * 2),
-            ])
-            .split(main_layout[1]);
+            ],
+        )
+        .split(main_layout[1]);
         {
             frame.render_stateful_widget(
                 List::new(app.main_menu_options.clone())
