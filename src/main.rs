@@ -64,12 +64,13 @@ fn main() {
         .encoder(Box::new(PatternEncoder::new(
             "[{d(%Y-%m-%d %H:%M:%S)}][{l}]:{m}{n}",
         )))
+        .append(false)
         .build("./logs/latest.log")
     {
         Ok(fa) => {
             match Config::builder()
                 .appender(Appender::builder().build("file", Box::new(fa)))
-                .build(Root::builder().appender("file").build(LevelFilter::Info))
+                .build(Root::builder().appender("file").build(LevelFilter::Debug))
             {
                 Ok(c) => match log4rs::init_config(c) {
                     Ok(_) => println!("初始化日志系统成功"),
@@ -220,49 +221,82 @@ fn input_process(app: &mut App) -> io::Result<()> {
         match event::read()? {
             Event::Key(key) => match key.kind {
                 KeyEventKind::Press => match key.code {
-                    KeyCode::Up => match app.menu_state {
-                        MenuState::MainMenu => {
-                            if let Some(i) = app.main_menu_options_state.selected() {
-                                app.main_menu_options_state.select(Some(
-                                    (i as i64 - 1).clamp(0, app.main_menu_options.len() as i64 - 1)
-                                        as usize,
-                                ))
+                    KeyCode::Up => {
+                        log::debug!("选择[上行]");
+                        match app.menu_state {
+                            MenuState::MainMenu => {
+                                if let Some(i) = app.main_menu_options_state.selected() {
+                                    app.main_menu_options_state.select(Some(
+                                        (i as i64 - 1)
+                                            .clamp(0, app.main_menu_options.len() as i64 - 1)
+                                            as usize,
+                                    ));
+                                }
+                                log::debug!(
+                                    "焦点[主菜单][{}]",
+                                    app.main_menu_options_state.selected().unwrap()
+                                );
+                            }
+                            MenuState::SideMenu => {
+                                if let Some(i) = app.side_menu_options_state.selected() {
+                                    app.side_menu_options_state.select(Some(
+                                        (i as i64 - 1)
+                                            .clamp(0, app.side_menu_options.len() as i64 - 1)
+                                            as usize,
+                                    ));
+                                }
+                                log::debug!(
+                                    "焦点[副菜单][{}]",
+                                    app.side_menu_options_state.selected().unwrap()
+                                );
                             }
                         }
-                        MenuState::SideMenu => {
-                            if let Some(i) = app.side_menu_options_state.selected() {
-                                app.side_menu_options_state.select(Some(
-                                    (i as i64 - 1).clamp(0, app.main_menu_options.len() as i64 - 1)
-                                        as usize,
-                                ))
+                    }
+                    KeyCode::Down => {
+                        log::debug!("选择[下行]");
+                        match app.menu_state {
+                            MenuState::MainMenu => {
+                                if let Some(i) = app.main_menu_options_state.selected() {
+                                    app.main_menu_options_state.select(Some(
+                                        (i as i64 + 1)
+                                            .clamp(0, app.main_menu_options.len() as i64 - 1)
+                                            as usize,
+                                    ));
+                                }
+                                log::debug!(
+                                    "焦点[主菜单][{}]",
+                                    app.main_menu_options_state.selected().unwrap()
+                                );
+                            }
+                            MenuState::SideMenu => {
+                                if let Some(i) = app.side_menu_options_state.selected() {
+                                    app.side_menu_options_state.select(Some(
+                                        (i as i64 + 1)
+                                            .clamp(0, app.side_menu_options.len() as i64 - 1)
+                                            as usize,
+                                    ));
+                                }
+                                log::debug!(
+                                    "焦点[主菜单][{}]",
+                                    app.side_menu_options_state.selected().unwrap()
+                                );
                             }
                         }
-                    },
-                    KeyCode::Down => match app.menu_state {
-                        MenuState::MainMenu => {
-                            if let Some(i) = app.main_menu_options_state.selected() {
-                                app.main_menu_options_state.select(Some(
-                                    (i as i64 + 1).clamp(0, app.main_menu_options.len() as i64 - 1)
-                                        as usize,
-                                ))
-                            }
-                        }
-                        MenuState::SideMenu => {
-                            if let Some(i) = app.side_menu_options_state.selected() {
-                                app.side_menu_options_state.select(Some(
-                                    (i as i64 + 1).clamp(0, app.main_menu_options.len() as i64 - 1)
-                                        as usize,
-                                ))
-                            }
-                        }
-                    },
+                    }
                     KeyCode::Tab => match app.menu_state {
-                        MenuState::MainMenu => app.menu_state = MenuState::SideMenu,
-                        MenuState::SideMenu => app.menu_state = MenuState::MainMenu,
+                        MenuState::MainMenu => {
+                            log::debug!("切换到副菜单");
+                            app.menu_state = MenuState::SideMenu;
+                        }
+                        MenuState::SideMenu => {
+                            log::debug!("切换到主菜单");
+                            app.menu_state = MenuState::MainMenu;
+                        }
                     },
                     KeyCode::Enter => match app.menu_state {
                         MenuState::MainMenu => match app.main_menu_state {
                             MainMenuState::RootMenu => {
+                                log::debug!("主菜单根菜单回车");
                                 if let Some(i) = app.main_menu_options_state.selected() {
                                     match i {
                                         0 => {
@@ -275,6 +309,7 @@ fn input_process(app: &mut App) -> io::Result<()> {
                                 }
                             }
                             MainMenuState::DeckSelectMenu => {
+                                log::debug!("主菜单卡组选择菜单回车");
                                 if let Some(i) = app.main_menu_options_state.selected() {
                                     match i {
                                         0 => app.main_menu_state = MainMenuState::RootMenu,
@@ -284,7 +319,11 @@ fn input_process(app: &mut App) -> io::Result<()> {
                             }
                         },
                         MenuState::SideMenu => {
-                            let _file_name = &app.deck_dir_file_name[0];
+                            log::debug!(
+                                "副菜单选择的卡组文件名称[{}]",
+                                app.deck_dir_file_name
+                                    [app.side_menu_options_state.selected().unwrap()]
+                            );
                         }
                     },
                     _ => (),
