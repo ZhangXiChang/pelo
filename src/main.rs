@@ -126,7 +126,6 @@ fn main() {
         }
         _ => None,
     };
-
     match Terminal::new(CrosstermBackend::new(io::stdout())) {
         Ok(mut t) => {
             info!("实例化终端UI绘制对象成功");
@@ -221,109 +220,76 @@ fn input_process(app: &mut App) -> io::Result<()> {
         match event::read()? {
             Event::Key(key) => match key.kind {
                 KeyEventKind::Press => match key.code {
-                    KeyCode::Up => {
-                        log::debug!("选择[上行]");
-                        match app.menu_state {
-                            MenuState::MainMenu => {
-                                if let Some(i) = app.main_menu_options_state.selected() {
-                                    app.main_menu_options_state.select(Some(
-                                        (i as i64 - 1)
-                                            .clamp(0, app.main_menu_options.len() as i64 - 1)
-                                            as usize,
-                                    ));
-                                }
-                                log::debug!(
-                                    "焦点[主菜单][{}]",
-                                    app.main_menu_options_state.selected().unwrap()
-                                );
-                            }
-                            MenuState::SideMenu => {
-                                if let Some(i) = app.side_menu_options_state.selected() {
-                                    app.side_menu_options_state.select(Some(
-                                        (i as i64 - 1)
-                                            .clamp(0, app.side_menu_options.len() as i64 - 1)
-                                            as usize,
-                                    ));
-                                }
-                                log::debug!(
-                                    "焦点[副菜单][{}]",
-                                    app.side_menu_options_state.selected().unwrap()
-                                );
-                            }
+                    KeyCode::Up | KeyCode::Down => {
+                        let mut length = 0;
+                        match key.code {
+                            KeyCode::Up => length = -1,
+                            KeyCode::Down => length = 1,
+                            _ => (),
                         }
-                    }
-                    KeyCode::Down => {
-                        log::debug!("选择[下行]");
                         match app.menu_state {
                             MenuState::MainMenu => {
                                 if let Some(i) = app.main_menu_options_state.selected() {
                                     app.main_menu_options_state.select(Some(
-                                        (i as i64 + 1)
-                                            .clamp(0, app.main_menu_options.len() as i64 - 1)
-                                            as usize,
+                                        (i as i64 + length).clamp(
+                                            0,
+                                            (app.main_menu_options.len() as i64 - 1)
+                                                .clamp(0, app.main_menu_options.len() as i64),
+                                        ) as usize,
                                     ));
                                 }
-                                log::debug!(
-                                    "焦点[主菜单][{}]",
-                                    app.main_menu_options_state.selected().unwrap()
-                                );
                             }
                             MenuState::SideMenu => {
                                 if let Some(i) = app.side_menu_options_state.selected() {
                                     app.side_menu_options_state.select(Some(
-                                        (i as i64 + 1)
-                                            .clamp(0, app.side_menu_options.len() as i64 - 1)
-                                            as usize,
+                                        (i as i64 + length).clamp(
+                                            0,
+                                            (app.side_menu_options.len() as i64 - 1)
+                                                .clamp(0, app.side_menu_options.len() as i64),
+                                        ) as usize,
                                     ));
                                 }
-                                log::debug!(
-                                    "焦点[主菜单][{}]",
-                                    app.side_menu_options_state.selected().unwrap()
-                                );
                             }
                         }
                     }
                     KeyCode::Tab => match app.menu_state {
                         MenuState::MainMenu => {
-                            log::debug!("切换到副菜单");
                             app.menu_state = MenuState::SideMenu;
                         }
                         MenuState::SideMenu => {
-                            log::debug!("切换到主菜单");
                             app.menu_state = MenuState::MainMenu;
                         }
                     },
                     KeyCode::Enter => match app.menu_state {
                         MenuState::MainMenu => match app.main_menu_state {
                             MainMenuState::RootMenu => {
-                                log::debug!("主菜单根菜单回车");
                                 if let Some(i) = app.main_menu_options_state.selected() {
                                     match i {
                                         0 => {
                                             app.main_menu_state = MainMenuState::DeckSelectMenu;
                                             app.menu_state = MenuState::SideMenu;
                                         }
-                                        1 => app.is_run = false,
+                                        1 => {
+                                            app.is_run = false;
+                                        }
                                         _ => (),
                                     }
                                 }
                             }
                             MainMenuState::DeckSelectMenu => {
-                                log::debug!("主菜单卡组选择菜单回车");
                                 if let Some(i) = app.main_menu_options_state.selected() {
                                     match i {
-                                        0 => app.main_menu_state = MainMenuState::RootMenu,
+                                        0 => {
+                                            app.main_menu_state = MainMenuState::RootMenu;
+                                        }
                                         _ => (),
                                     }
                                 }
                             }
                         },
                         MenuState::SideMenu => {
-                            log::debug!(
-                                "副菜单选择的卡组文件名称[{}]",
-                                app.deck_dir_file_name
-                                    [app.side_menu_options_state.selected().unwrap()]
-                            );
+                            let _ = app.deck_dir_file_name
+                                [app.side_menu_options_state.selected().unwrap()];
                         }
                     },
                     _ => (),
