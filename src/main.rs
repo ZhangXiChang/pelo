@@ -70,7 +70,7 @@ fn main() {
         Ok(fa) => {
             match Config::builder()
                 .appender(Appender::builder().build("file", Box::new(fa)))
-                .build(Root::builder().appender("file").build(LevelFilter::Debug))
+                .build(Root::builder().appender("file").build(LevelFilter::Info))
             {
                 Ok(c) => match log4rs::init_config(c) {
                     Ok(_) => println!("初始化日志系统成功"),
@@ -130,7 +130,6 @@ fn main() {
         Ok(mut t) => {
             info!("实例化终端UI绘制对象成功");
             while app.is_run {
-                //主菜单
                 app.main_menu_options = match app.main_menu_state {
                     MainMenuState::RootMenu => vec![
                         ListItem::new("让我康康你的卡组"),
@@ -138,7 +137,6 @@ fn main() {
                     ],
                     MainMenuState::DeckSelectMenu => vec![ListItem::new("返回")],
                 };
-                //副菜单
                 app.deck_dir_file_name = match fs::read_dir("./assets/deck") {
                     Ok(entrys) => {
                         let mut file_name_list = vec![];
