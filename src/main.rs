@@ -220,38 +220,38 @@ fn input_process(app: &mut App) -> io::Result<()> {
         match event::read()? {
             Event::Key(key) => match key.kind {
                 KeyEventKind::Press => match key.code {
-                    KeyCode::Up | KeyCode::Down => {
-                        let mut length = 0;
-                        match key.code {
-                            KeyCode::Up => length = -1,
-                            KeyCode::Down => length = 1,
-                            _ => (),
+                    KeyCode::Up => match app.menu_state {
+                        MenuState::MainMenu => {
+                            step_list_state(
+                                &app.main_menu_options,
+                                &mut app.main_menu_options_state,
+                                &-1,
+                            );
                         }
-                        match app.menu_state {
-                            MenuState::MainMenu => {
-                                if let Some(i) = app.main_menu_options_state.selected() {
-                                    app.main_menu_options_state.select(Some(
-                                        (i as i64 + length).clamp(
-                                            0,
-                                            (app.main_menu_options.len() as i64 - 1)
-                                                .clamp(0, app.main_menu_options.len() as i64),
-                                        ) as usize,
-                                    ));
-                                }
-                            }
-                            MenuState::SideMenu => {
-                                if let Some(i) = app.side_menu_options_state.selected() {
-                                    app.side_menu_options_state.select(Some(
-                                        (i as i64 + length).clamp(
-                                            0,
-                                            (app.side_menu_options.len() as i64 - 1)
-                                                .clamp(0, app.side_menu_options.len() as i64),
-                                        ) as usize,
-                                    ));
-                                }
-                            }
+                        MenuState::SideMenu => {
+                            step_list_state(
+                                &app.side_menu_options,
+                                &mut app.side_menu_options_state,
+                                &-1,
+                            );
                         }
-                    }
+                    },
+                    KeyCode::Down => match app.menu_state {
+                        MenuState::MainMenu => {
+                            step_list_state(
+                                &app.main_menu_options,
+                                &mut app.main_menu_options_state,
+                                &1,
+                            );
+                        }
+                        MenuState::SideMenu => {
+                            step_list_state(
+                                &app.side_menu_options,
+                                &mut app.side_menu_options_state,
+                                &1,
+                            );
+                        }
+                    },
                     KeyCode::Tab => match app.menu_state {
                         MenuState::MainMenu => {
                             app.menu_state = MenuState::SideMenu;
@@ -362,5 +362,17 @@ fn draw(frame: &mut Frame, app: &mut App) {
                 );
             }
         }
+    }
+}
+fn step_list_state<'a>(
+    item_list: &Vec<ListItem<'a>>,
+    list_state: &mut ListState,
+    step_length: &i64,
+) {
+    if let Some(i) = list_state.selected() {
+        list_state.select(Some((i as i64 + step_length).clamp(
+            0,
+            (item_list.len() as i64 - 1).clamp(0, item_list.len() as i64),
+        ) as usize));
     }
 }
