@@ -5,12 +5,7 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
-use log::{error, info, warn, LevelFilter};
-use log4rs::{
-    append::{console::ConsoleAppender, file::FileAppender},
-    config::{Appender, Root},
-    encode::pattern::PatternEncoder,
-};
+use log::{error, info, warn};
 use ratatui::{
     prelude::*,
     widgets::{canvas::Canvas, *},
@@ -24,135 +19,11 @@ enum MainMenuState {
     RootMenu,
     DeckSelectMenu,
 }
-enum LogMode {
-    Console,
-    File,
-    All,
-}
 
 struct ImagePoints {
     width: f64,
     height: f64,
     points: Vec<(f64, f64)>,
-}
-
-pub struct Log {
-    log_mode: LogMode,
-    log_file_path: Option<String>,
-    log_level: LevelFilter,
-}
-impl Log {
-    pub fn new() -> Self {
-        let _ = LogMode::Console;
-        let _ = LogMode::File;
-        let _ = LogMode::All;
-        Self {
-            log_mode: LogMode::File,
-            log_file_path: Some("./logs/latest.log".to_string()),
-            log_level: LevelFilter::Info,
-        }
-    }
-    pub fn enable(&mut self) {
-        let log_config;
-        let pattern_encoder = Box::new(PatternEncoder::new("[{d(%Y-%m-%d %H:%M:%S)}][{l}]:{m}{n}"));
-        match self.log_mode {
-            LogMode::Console => {
-                match log4rs::Config::builder()
-                    .appender(
-                        Appender::builder().build(
-                            "console_log",
-                            Box::new(
-                                ConsoleAppender::builder()
-                                    .encoder(pattern_encoder.clone())
-                                    .build(),
-                            ),
-                        ),
-                    )
-                    .build(
-                        Root::builder()
-                            .appender("console_log")
-                            .build(self.log_level),
-                    ) {
-                    Ok(c) => log_config = c,
-                    Err(e) => {
-                        panic!("日志配置构建失败，返回的错误信息：{}", e);
-                    }
-                }
-            }
-            LogMode::File => {
-                if let Some(log_file_path) = &self.log_file_path {
-                    match FileAppender::builder()
-                        .encoder(pattern_encoder.clone())
-                        .append(false)
-                        .build(log_file_path)
-                    {
-                        Ok(fa) => {
-                            match log4rs::Config::builder()
-                                .appender(Appender::builder().build("file_log", Box::new(fa)))
-                                .build(Root::builder().appender("file_log").build(self.log_level))
-                            {
-                                Ok(c) => log_config = c,
-                                Err(e) => {
-                                    panic!("日志配置构建失败，返回的错误信息：{}", e);
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            panic!("日志输出器构建失败，返回的错误信息：{}", e);
-                        }
-                    }
-                } else {
-                    panic!("没有设置日志文件路径");
-                }
-            }
-            LogMode::All => {
-                if let Some(log_file_path) = &self.log_file_path {
-                    match FileAppender::builder()
-                        .encoder(pattern_encoder.clone())
-                        .append(false)
-                        .build(log_file_path)
-                    {
-                        Ok(fa) => {
-                            match log4rs::Config::builder()
-                                .appender(
-                                    Appender::builder().build(
-                                        "console_log",
-                                        Box::new(
-                                            ConsoleAppender::builder()
-                                                .encoder(pattern_encoder.clone())
-                                                .build(),
-                                        ),
-                                    ),
-                                )
-                                .appender(Appender::builder().build("file_log", Box::new(fa)))
-                                .build(
-                                    Root::builder()
-                                        .appender("console_log")
-                                        .appender("file_log")
-                                        .build(self.log_level),
-                                ) {
-                                Ok(c) => log_config = c,
-                                Err(e) => {
-                                    panic!("日志配置构建失败，返回的错误信息：{}", e);
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            panic!("日志输出器构建失败，返回的错误信息：{}", e);
-                        }
-                    }
-                } else {
-                    panic!("没有设置日志文件路径");
-                }
-            }
-        }
-        match log4rs::init_config(log_config) {
-            Ok(_) => info!("初始化日志系统成功"),
-            Err(e) => {
-                panic!("日志初始化失败，返回的错误信息：{}", e);
-            }
-        }
-    }
 }
 
 pub struct App<'a> {

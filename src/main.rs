@@ -1,8 +1,10 @@
 mod app;
+mod log_record;
 
 use app::*;
+use log_record::*;
 
 fn main() {
-    Log::new().enable();
+    LogRecord::new().enable();
     App::new().run();
 }
