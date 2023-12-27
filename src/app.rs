@@ -237,7 +237,10 @@ impl<'a> App<'a> {
                                         Ok(m) => {
                                             if m.is_file() {
                                                 if let Some(file_name) = de.file_name().to_str() {
-                                                    file_name_list.push(file_name.to_string());
+                                                    if let Some(i) = file_name.rfind(".ydk") {
+                                                        file_name_list
+                                                            .push(file_name[0..i].to_string());
+                                                    }
                                                 }
                                             }
                                         }
