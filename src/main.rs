@@ -5,6 +5,6 @@ use app::*;
 use log_record::*;
 
 fn main() {
-    LogRecord::new().enable();
+    LogRecord::new().start();
     App::new().run();
 }

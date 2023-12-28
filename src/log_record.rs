@@ -25,7 +25,7 @@ impl LogRecord {
             log_level: log::LevelFilter::Info,
         }
     }
-    pub fn enable(&mut self) {
+    pub fn start(&mut self) {
         let log_config;
         let pattern_encoder = Box::new(PatternEncoder::new("[{d(%Y-%m-%d %H:%M:%S)}][{l}]:{m}{n}"));
         match self.log_mode {
