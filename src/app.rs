@@ -143,6 +143,13 @@ impl App {
             .split(main_layout[1]);
             {
                 //主菜单
+                let mut main_menu_title: Span<'_> = "主菜单".into();
+                match self.menu_state {
+                    MenuState::Main => {
+                        main_menu_title = main_menu_title.add_modifier(Modifier::REVERSED)
+                    }
+                    MenuState::Side => (),
+                }
                 let main_menu_items;
                 match self.main_menu_state {
                     MainMenuState::Root => {
@@ -153,13 +160,20 @@ impl App {
                 self.main_menu_items_len = main_menu_items.len();
                 frame.render_stateful_widget(
                     List::new(main_menu_items)
-                        .block(Block::new().borders(Borders::ALL).title("主菜单"))
+                        .block(Block::new().borders(Borders::ALL).title(main_menu_title))
                         .highlight_style(Style::new().add_modifier(Modifier::BOLD))
                         .highlight_symbol(">> "),
                     content_layout[0],
                     &mut self.main_menu_items_state,
                 );
                 //副菜单
+                let mut side_menu_title: Span<'_> = "副菜单".into();
+                match self.menu_state {
+                    MenuState::Main => (),
+                    MenuState::Side => {
+                        side_menu_title = side_menu_title.add_modifier(Modifier::REVERSED)
+                    }
+                }
                 let mut side_menu_items = Vec::<String>::new();
                 match self.side_menu_state {
                     SideMenuState::Null => (),
@@ -173,7 +187,7 @@ impl App {
                 self.side_menu_items_len = side_menu_items.len();
                 frame.render_stateful_widget(
                     List::new(side_menu_items)
-                        .block(Block::new().borders(Borders::ALL).title("副菜单"))
+                        .block(Block::new().borders(Borders::ALL).title(side_menu_title))
                         .highlight_style(Style::new().add_modifier(Modifier::BOLD))
                         .highlight_symbol(">> "),
                     content_layout[1],
