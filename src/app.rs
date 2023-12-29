@@ -11,9 +11,9 @@ use ratatui::{
     widgets::{canvas::Canvas, *},
 };
 
-enum MenuState {
-    Main,
-    Side,
+enum Focus {
+    MainMenu,
+    SideMenu,
 }
 enum MainMenuState {
     Root,
@@ -47,7 +47,7 @@ impl<T> Menu<T> {
 
 pub struct App {
     is_run: bool,
-    menu_state: MenuState,
+    focus: Focus,
     main_menu: Menu<MainMenuState>,
     side_menu: Menu<SideMenuState>,
     kbn_points: Option<Points>,
@@ -70,7 +70,7 @@ impl App {
         }
         Self {
             is_run: true,
-            menu_state: MenuState::Main,
+            focus: Focus::MainMenu,
             main_menu: Menu::new(MainMenuState::Root),
             side_menu: Menu::new(SideMenuState::Null),
             kbn_points: None,
@@ -151,11 +151,11 @@ impl App {
             {
                 //主菜单
                 let mut main_menu_title: Span<'_> = "主菜单".into();
-                match self.menu_state {
-                    MenuState::Main => {
+                match self.focus {
+                    Focus::MainMenu => {
                         main_menu_title = main_menu_title.add_modifier(Modifier::REVERSED)
                     }
-                    MenuState::Side => (),
+                    Focus::SideMenu => (),
                 }
                 let main_menu_items;
                 match self.main_menu.state {
@@ -175,9 +175,9 @@ impl App {
                 );
                 //副菜单
                 let mut side_menu_title: Span<'_> = "副菜单".into();
-                match self.menu_state {
-                    MenuState::Main => (),
-                    MenuState::Side => {
+                match self.focus {
+                    Focus::MainMenu => (),
+                    Focus::SideMenu => {
                         side_menu_title = side_menu_title.add_modifier(Modifier::REVERSED)
                     }
                 }
@@ -229,15 +229,15 @@ impl App {
             match event::read()? {
                 Event::Key(key) => match key.kind {
                     KeyEventKind::Press => match key.code {
-                        KeyCode::Up => match self.menu_state {
-                            MenuState::Main => {
+                        KeyCode::Up => match self.focus {
+                            Focus::MainMenu => {
                                 Self::step_list_state(
                                     self.main_menu.items_len,
                                     &mut self.main_menu.items_state,
                                     -1,
                                 );
                             }
-                            MenuState::Side => {
+                            Focus::SideMenu => {
                                 Self::step_list_state(
                                     self.side_menu.items_len,
                                     &mut self.side_menu.items_state,
@@ -245,15 +245,15 @@ impl App {
                                 );
                             }
                         },
-                        KeyCode::Down => match self.menu_state {
-                            MenuState::Main => {
+                        KeyCode::Down => match self.focus {
+                            Focus::MainMenu => {
                                 Self::step_list_state(
                                     self.main_menu.items_len,
                                     &mut self.main_menu.items_state,
                                     1,
                                 );
                             }
-                            MenuState::Side => {
+                            Focus::SideMenu => {
                                 Self::step_list_state(
                                     self.side_menu.items_len,
                                     &mut self.side_menu.items_state,
@@ -261,12 +261,12 @@ impl App {
                                 );
                             }
                         },
-                        KeyCode::Tab => match self.menu_state {
-                            MenuState::Main => self.menu_state = MenuState::Side,
-                            MenuState::Side => self.menu_state = MenuState::Main,
+                        KeyCode::Tab => match self.focus {
+                            Focus::MainMenu => self.focus = Focus::SideMenu,
+                            Focus::SideMenu => self.focus = Focus::MainMenu,
                         },
-                        KeyCode::Enter => match self.menu_state {
-                            MenuState::Main => match self.main_menu.state {
+                        KeyCode::Enter => match self.focus {
+                            Focus::MainMenu => match self.main_menu.state {
                                 MainMenuState::Root => {
                                     if let Some(i) = self.main_menu.items_state.selected() {
                                         match i {
@@ -282,7 +282,7 @@ impl App {
                                             0 => {
                                                 self.side_menu.state =
                                                     SideMenuState::SelectDeckFromFile;
-                                                self.menu_state = MenuState::Side;
+                                                self.focus = Focus::SideMenu;
                                             }
                                             1 => {
                                                 self.side_menu.state = SideMenuState::Null;
@@ -293,7 +293,7 @@ impl App {
                                     }
                                 }
                             },
-                            MenuState::Side => match self.side_menu.state {
+                            Focus::SideMenu => match self.side_menu.state {
                                 SideMenuState::Null => (),
                                 SideMenuState::SelectDeckFromFile => (),
                             },
