@@ -30,15 +30,40 @@ struct Points {
     points: Vec<(f64, f64)>,
 }
 
+struct MainMenu {
+    state: MainMenuState,
+    items_state: ListState,
+    items_len: usize,
+}
+impl MainMenu {
+    fn new() -> Self {
+        Self {
+            state: MainMenuState::Root,
+            items_state: ListState::default(),
+            items_len: 0,
+        }
+    }
+}
+struct SideMenu {
+    state: SideMenuState,
+    items_state: ListState,
+    items_len: usize,
+}
+impl SideMenu {
+    fn new() -> Self {
+        Self {
+            state: SideMenuState::Null,
+            items_state: ListState::default(),
+            items_len: 0,
+        }
+    }
+}
+
 pub struct App {
     is_run: bool,
     menu_state: MenuState,
-    main_menu_state: MainMenuState,
-    main_menu_items_state: ListState,
-    main_menu_items_len: usize,
-    side_menu_state: SideMenuState,
-    side_menu_items_state: ListState,
-    side_menu_items_len: usize,
+    main_menu: MainMenu,
+    side_menu: SideMenu,
     kbn_points: Option<Points>,
 }
 impl App {
@@ -60,12 +85,8 @@ impl App {
         Self {
             is_run: true,
             menu_state: MenuState::Main,
-            main_menu_state: MainMenuState::Root,
-            main_menu_items_state: ListState::default(),
-            main_menu_items_len: 0,
-            side_menu_state: SideMenuState::Null,
-            side_menu_items_state: ListState::default(),
-            side_menu_items_len: 0,
+            main_menu: MainMenu::new(),
+            side_menu: SideMenu::new(),
             kbn_points: None,
         }
     }
@@ -73,8 +94,8 @@ impl App {
         match Terminal::new(CrosstermBackend::new(io::stdout())) {
             Ok(mut t) => {
                 info!("实例化终端UI绘制对象成功");
-                self.main_menu_items_state.select(Some(0));
-                self.side_menu_items_state.select(Some(0));
+                self.main_menu.items_state.select(Some(0));
+                self.side_menu.items_state.select(Some(0));
                 self.kbn_points = match image::open("./assets/texture/kbn.png") {
                     Ok(img) => {
                         let gimg = img.flipv().to_luma8();
@@ -151,20 +172,20 @@ impl App {
                     MenuState::Side => (),
                 }
                 let main_menu_items;
-                match self.main_menu_state {
+                match self.main_menu.state {
                     MainMenuState::Root => {
                         main_menu_items = vec!["让我康康你的卡组", "退出牌佬助手"]
                     }
                     MainMenuState::SelectDeck => main_menu_items = vec!["从文件读取卡组", "返回"],
                 }
-                self.main_menu_items_len = main_menu_items.len();
+                self.main_menu.items_len = main_menu_items.len();
                 frame.render_stateful_widget(
                     List::new(main_menu_items)
                         .block(Block::new().borders(Borders::ALL).title(main_menu_title))
                         .highlight_style(Style::new().add_modifier(Modifier::BOLD))
                         .highlight_symbol(">> "),
                     content_layout[0],
-                    &mut self.main_menu_items_state,
+                    &mut self.main_menu.items_state,
                 );
                 //副菜单
                 let mut side_menu_title: Span<'_> = "副菜单".into();
@@ -175,7 +196,7 @@ impl App {
                     }
                 }
                 let mut side_menu_items = Vec::<String>::new();
-                match self.side_menu_state {
+                match self.side_menu.state {
                     SideMenuState::Null => (),
                     SideMenuState::SelectDeckFromFile => {
                         side_menu_items = Self::query_dir_file_name_suffix(
@@ -184,14 +205,14 @@ impl App {
                         );
                     }
                 }
-                self.side_menu_items_len = side_menu_items.len();
+                self.side_menu.items_len = side_menu_items.len();
                 frame.render_stateful_widget(
                     List::new(side_menu_items)
                         .block(Block::new().borders(Borders::ALL).title(side_menu_title))
                         .highlight_style(Style::new().add_modifier(Modifier::BOLD))
                         .highlight_symbol(">> "),
                     content_layout[1],
-                    &mut self.side_menu_items_state,
+                    &mut self.side_menu.items_state,
                 );
                 //看板娘
                 if let Some(points) = &self.kbn_points {
@@ -225,15 +246,15 @@ impl App {
                         KeyCode::Up => match self.menu_state {
                             MenuState::Main => {
                                 Self::step_list_state(
-                                    self.main_menu_items_len,
-                                    &mut self.main_menu_items_state,
+                                    self.main_menu.items_len,
+                                    &mut self.main_menu.items_state,
                                     -1,
                                 );
                             }
                             MenuState::Side => {
                                 Self::step_list_state(
-                                    self.side_menu_items_len,
-                                    &mut self.side_menu_items_state,
+                                    self.side_menu.items_len,
+                                    &mut self.side_menu.items_state,
                                     -1,
                                 );
                             }
@@ -241,15 +262,15 @@ impl App {
                         KeyCode::Down => match self.menu_state {
                             MenuState::Main => {
                                 Self::step_list_state(
-                                    self.main_menu_items_len,
-                                    &mut self.main_menu_items_state,
+                                    self.main_menu.items_len,
+                                    &mut self.main_menu.items_state,
                                     1,
                                 );
                             }
                             MenuState::Side => {
                                 Self::step_list_state(
-                                    self.side_menu_items_len,
-                                    &mut self.side_menu_items_state,
+                                    self.side_menu.items_len,
+                                    &mut self.side_menu.items_state,
                                     1,
                                 );
                             }
@@ -259,34 +280,37 @@ impl App {
                             MenuState::Side => self.menu_state = MenuState::Main,
                         },
                         KeyCode::Enter => match self.menu_state {
-                            MenuState::Main => match self.main_menu_state {
+                            MenuState::Main => match self.main_menu.state {
                                 MainMenuState::Root => {
-                                    if let Some(i) = self.main_menu_items_state.selected() {
+                                    if let Some(i) = self.main_menu.items_state.selected() {
                                         match i {
-                                            0 => self.main_menu_state = MainMenuState::SelectDeck,
+                                            0 => self.main_menu.state = MainMenuState::SelectDeck,
                                             1 => self.is_run = false,
                                             _ => (),
                                         }
                                     }
                                 }
                                 MainMenuState::SelectDeck => {
-                                    if let Some(i) = self.main_menu_items_state.selected() {
+                                    if let Some(i) = self.main_menu.items_state.selected() {
                                         match i {
                                             0 => {
-                                                self.side_menu_state =
+                                                self.side_menu.state =
                                                     SideMenuState::SelectDeckFromFile;
                                                 self.menu_state = MenuState::Side;
                                             }
                                             1 => {
-                                                self.side_menu_state = SideMenuState::Null;
-                                                self.main_menu_state = MainMenuState::Root;
+                                                self.side_menu.state = SideMenuState::Null;
+                                                self.main_menu.state = MainMenuState::Root;
                                             }
                                             _ => (),
                                         }
                                     }
                                 }
                             },
-                            MenuState::Side => (),
+                            MenuState::Side => match self.side_menu.state {
+                                SideMenuState::Null => (),
+                                SideMenuState::SelectDeckFromFile => (),
+                            },
                         },
                         _ => (),
                     },
