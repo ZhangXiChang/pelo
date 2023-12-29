@@ -11,6 +11,8 @@ use ratatui::{
     widgets::{canvas::Canvas, *},
 };
 
+use crate::deck::*;
+
 enum Focus {
     MainMenu,
     SideMenu,
@@ -51,6 +53,7 @@ pub struct App {
     main_menu: Menu<MainMenuState>,
     side_menu: Menu<SideMenuState>,
     kbn_points: Option<Points>,
+    deck_name_list: Vec<String>,
 }
 impl App {
     pub fn new() -> Self {
@@ -74,9 +77,10 @@ impl App {
             main_menu: Menu::new(MainMenuState::Root),
             side_menu: Menu::new(SideMenuState::Null),
             kbn_points: None,
+            deck_name_list: vec![],
         }
     }
-    pub fn run(&mut self) {
+    pub async fn run(&mut self) {
         match Terminal::new(CrosstermBackend::new(io::stdout())) {
             Ok(mut t) => {
                 info!("实例化终端UI绘制对象成功");
@@ -104,18 +108,28 @@ impl App {
                 };
                 while self.is_run {
                     match t.draw(|frame| self.draw(frame)) {
+                        Ok(_) => (),
                         Err(e) => {
                             error!("绘制终端UI失败，返回的错误信息：{}", e);
                             exit(-1);
                         }
-                        _ => (),
                     }
-                    match self.input_process() {
+                    match poll(time::Duration::from_millis(0)) {
+                        Ok(b) => {
+                            if b {
+                                match event::read() {
+                                    Ok(e) => self.input_process(e).await,
+                                    Err(e) => {
+                                        error!("读取事件失败，返回的错误信息：{}", e);
+                                        exit(-1);
+                                    }
+                                }
+                            }
+                        }
                         Err(e) => {
-                            error!("输入处理出错，返回的错误信息：{}", e);
+                            error!("跳过阻塞失败，返回的错误信息：{}", e);
                             exit(-1);
                         }
-                        _ => (),
                     }
                 }
             }
@@ -150,7 +164,7 @@ impl App {
             .split(main_layout[1]);
             {
                 //主菜单
-                let mut main_menu_title: Span<'_> = "主菜单".into();
+                let mut main_menu_title = Span::from("主菜单");
                 match self.focus {
                     Focus::MainMenu => {
                         main_menu_title = main_menu_title.add_modifier(Modifier::REVERSED)
@@ -174,7 +188,7 @@ impl App {
                     &mut self.main_menu.items_state,
                 );
                 //副菜单
-                let mut side_menu_title: Span<'_> = "副菜单".into();
+                let mut side_menu_title = Span::from("副菜单");
                 match self.focus {
                     Focus::MainMenu => (),
                     Focus::SideMenu => {
@@ -191,6 +205,7 @@ impl App {
                         );
                     }
                 }
+                self.deck_name_list = side_menu_items.clone();
                 self.side_menu.items_len = side_menu_items.len();
                 frame.render_stateful_widget(
                     List::new(side_menu_items)
@@ -224,88 +239,100 @@ impl App {
             }
         }
     }
-    fn input_process(&mut self) -> io::Result<()> {
-        if poll(time::Duration::from_millis(0))? {
-            match event::read()? {
-                Event::Key(key) => match key.kind {
-                    KeyEventKind::Press => match key.code {
-                        KeyCode::Up => match self.focus {
-                            Focus::MainMenu => {
-                                Self::step_list_state(
-                                    self.main_menu.items_len,
-                                    &mut self.main_menu.items_state,
-                                    -1,
-                                );
-                            }
-                            Focus::SideMenu => {
-                                Self::step_list_state(
-                                    self.side_menu.items_len,
-                                    &mut self.side_menu.items_state,
-                                    -1,
-                                );
-                            }
-                        },
-                        KeyCode::Down => match self.focus {
-                            Focus::MainMenu => {
-                                Self::step_list_state(
-                                    self.main_menu.items_len,
-                                    &mut self.main_menu.items_state,
-                                    1,
-                                );
-                            }
-                            Focus::SideMenu => {
-                                Self::step_list_state(
-                                    self.side_menu.items_len,
-                                    &mut self.side_menu.items_state,
-                                    1,
-                                );
-                            }
-                        },
-                        KeyCode::Tab => match self.focus {
-                            Focus::MainMenu => self.focus = Focus::SideMenu,
-                            Focus::SideMenu => self.focus = Focus::MainMenu,
-                        },
-                        KeyCode::Enter => match self.focus {
-                            Focus::MainMenu => match self.main_menu.state {
-                                MainMenuState::Root => {
-                                    if let Some(i) = self.main_menu.items_state.selected() {
-                                        match i {
-                                            0 => self.main_menu.state = MainMenuState::SelectDeck,
-                                            1 => self.is_run = false,
-                                            _ => (),
-                                        }
+    async fn input_process(&mut self, event: Event) {
+        match event {
+            Event::Key(key) => match key.kind {
+                KeyEventKind::Press => match key.code {
+                    KeyCode::Up => match self.focus {
+                        Focus::MainMenu => {
+                            Self::step_list_state(
+                                self.main_menu.items_len,
+                                &mut self.main_menu.items_state,
+                                -1,
+                            );
+                        }
+                        Focus::SideMenu => {
+                            Self::step_list_state(
+                                self.side_menu.items_len,
+                                &mut self.side_menu.items_state,
+                                -1,
+                            );
+                        }
+                    },
+                    KeyCode::Down => match self.focus {
+                        Focus::MainMenu => {
+                            Self::step_list_state(
+                                self.main_menu.items_len,
+                                &mut self.main_menu.items_state,
+                                1,
+                            );
+                        }
+                        Focus::SideMenu => {
+                            Self::step_list_state(
+                                self.side_menu.items_len,
+                                &mut self.side_menu.items_state,
+                                1,
+                            );
+                        }
+                    },
+                    KeyCode::Tab => match self.focus {
+                        Focus::MainMenu => self.focus = Focus::SideMenu,
+                        Focus::SideMenu => self.focus = Focus::MainMenu,
+                    },
+                    KeyCode::Enter => match self.focus {
+                        Focus::MainMenu => match self.main_menu.state {
+                            MainMenuState::Root => {
+                                if let Some(i) = self.main_menu.items_state.selected() {
+                                    match i {
+                                        0 => self.main_menu.state = MainMenuState::SelectDeck,
+                                        1 => self.is_run = false,
+                                        _ => (),
                                     }
                                 }
-                                MainMenuState::SelectDeck => {
-                                    if let Some(i) = self.main_menu.items_state.selected() {
-                                        match i {
-                                            0 => {
-                                                self.side_menu.state =
-                                                    SideMenuState::SelectDeckFromFile;
-                                                self.focus = Focus::SideMenu;
-                                            }
-                                            1 => {
-                                                self.side_menu.state = SideMenuState::Null;
-                                                self.main_menu.state = MainMenuState::Root;
-                                            }
-                                            _ => (),
+                            }
+                            MainMenuState::SelectDeck => {
+                                if let Some(i) = self.main_menu.items_state.selected() {
+                                    match i {
+                                        0 => {
+                                            self.side_menu.state =
+                                                SideMenuState::SelectDeckFromFile;
+                                            self.focus = Focus::SideMenu;
                                         }
+                                        1 => {
+                                            self.side_menu.state = SideMenuState::Null;
+                                            self.main_menu.state = MainMenuState::Root;
+                                        }
+                                        _ => (),
                                     }
                                 }
-                            },
-                            Focus::SideMenu => match self.side_menu.state {
-                                SideMenuState::Null => (),
-                                SideMenuState::SelectDeckFromFile => (),
-                            },
+                            }
                         },
-                        _ => (),
+                        Focus::SideMenu => match self.side_menu.state {
+                            SideMenuState::Null => (),
+                            SideMenuState::SelectDeckFromFile => {
+                                if let Some(i) = self.side_menu.items_state.selected() {
+                                    match Deck::from_file(
+                                        self.deck_name_list[i].clone(),
+                                        format!(
+                                            "./assets/deck/{}.ydk",
+                                            self.deck_name_list[i].clone()
+                                        ),
+                                    )
+                                    .await
+                                    {
+                                        Ok(d) => info!("{}", d.main[0].name),
+                                        Err(e) => error!("{}", e),
+                                    }
+                                }
+                            }
+                        },
                     },
                     _ => (),
                 },
                 _ => (),
-            }
+            },
+            _ => (),
         }
-        Ok(())
     }
     fn step_list_state(item_len: usize, list_state: &mut ListState, step_length: i64) {
         if let Some(i) = list_state.selected() {

@@ -1,10 +1,12 @@
 mod app;
+mod deck;
 mod log_record;
 
 use app::*;
 use log_record::*;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     LogRecord::new().start();
-    App::new().run();
+    App::new().run().await;
 }
