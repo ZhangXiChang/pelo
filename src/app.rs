@@ -30,29 +30,15 @@ struct Points {
     points: Vec<(f64, f64)>,
 }
 
-struct MainMenu {
-    state: MainMenuState,
+struct Menu<T> {
+    state: T,
     items_state: ListState,
     items_len: usize,
 }
-impl MainMenu {
-    fn new() -> Self {
+impl<T> Menu<T> {
+    fn new(state: T) -> Self {
         Self {
-            state: MainMenuState::Root,
-            items_state: ListState::default(),
-            items_len: 0,
-        }
-    }
-}
-struct SideMenu {
-    state: SideMenuState,
-    items_state: ListState,
-    items_len: usize,
-}
-impl SideMenu {
-    fn new() -> Self {
-        Self {
-            state: SideMenuState::Null,
+            state,
             items_state: ListState::default(),
             items_len: 0,
         }
@@ -62,8 +48,8 @@ impl SideMenu {
 pub struct App {
     is_run: bool,
     menu_state: MenuState,
-    main_menu: MainMenu,
-    side_menu: SideMenu,
+    main_menu: Menu<MainMenuState>,
+    side_menu: Menu<SideMenuState>,
     kbn_points: Option<Points>,
 }
 impl App {
@@ -85,8 +71,8 @@ impl App {
         Self {
             is_run: true,
             menu_state: MenuState::Main,
-            main_menu: MainMenu::new(),
-            side_menu: SideMenu::new(),
+            main_menu: Menu::new(MainMenuState::Root),
+            side_menu: Menu::new(SideMenuState::Null),
             kbn_points: None,
         }
     }
