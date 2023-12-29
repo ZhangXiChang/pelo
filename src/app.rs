@@ -53,7 +53,8 @@ pub struct App {
     main_menu: Menu<MainMenuState>,
     side_menu: Menu<SideMenuState>,
     kbn_points: Option<Points>,
-    deck_name_list: Vec<String>,
+    deck_name_list: Option<Vec<String>>,
+    deck: Option<Deck>,
 }
 impl App {
     pub fn new() -> Self {
@@ -77,7 +78,8 @@ impl App {
             main_menu: Menu::new(MainMenuState::Root),
             side_menu: Menu::new(SideMenuState::Null),
             kbn_points: None,
-            deck_name_list: vec![],
+            deck_name_list: None,
+            deck: None,
         }
     }
     pub async fn run(&mut self) {
@@ -205,7 +207,7 @@ impl App {
                         );
                     }
                 }
-                self.deck_name_list = side_menu_items.clone();
+                self.deck_name_list = Some(side_menu_items.clone());
                 self.side_menu.items_len = side_menu_items.len();
                 frame.render_stateful_widget(
                     List::new(side_menu_items)
@@ -311,17 +313,16 @@ impl App {
                             SideMenuState::Null => (),
                             SideMenuState::SelectDeckFromFile => {
                                 if let Some(i) = self.side_menu.items_state.selected() {
-                                    match Deck::from_file(
-                                        self.deck_name_list[i].clone(),
-                                        format!(
-                                            "./assets/deck/{}.ydk",
-                                            self.deck_name_list[i].clone()
-                                        ),
-                                    )
-                                    .await
-                                    {
-                                        Ok(d) => info!("{}", d.main[0].name),
-                                        Err(e) => error!("{}", e),
+                                    if let Some(deck_name_list) = &self.deck_name_list {
+                                        match Deck::from_file(
+                                            deck_name_list[i].clone(),
+                                            format!("./assets/deck/{}.ydk", deck_name_list[i]),
+                                        )
+                                        .await
+                                        {
+                                            Ok(d) => self.deck = Some(d),
+                                            Err(e) => error!("{}", e),
+                                        }
                                     }
                                 }
                             }

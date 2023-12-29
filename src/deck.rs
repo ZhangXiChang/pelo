@@ -74,7 +74,7 @@ impl Deck {
     }
     pub async fn from_text(name: String, deck_text: String) -> Result<Self, String> {
         let mut main = vec![];
-        match Self::read_deck_card_id(deck_text.clone(), DeckArea::Main) {
+        match Self::read_deck_card_id(&deck_text, DeckArea::Main) {
             Ok(dil) => {
                 for id in dil {
                     match Card::from_id(id).await {
@@ -86,7 +86,7 @@ impl Deck {
             Err(e) => return Err(e),
         }
         let mut extra = vec![];
-        match Self::read_deck_card_id(deck_text.clone(), DeckArea::Extra) {
+        match Self::read_deck_card_id(&deck_text, DeckArea::Extra) {
             Ok(dil) => {
                 for id in dil {
                     match Card::from_id(id).await {
@@ -98,7 +98,7 @@ impl Deck {
             Err(e) => return Err(e),
         }
         let mut side = vec![];
-        match Self::read_deck_card_id(deck_text.clone(), DeckArea::Side) {
+        match Self::read_deck_card_id(&deck_text, DeckArea::Side) {
             Ok(dil) => {
                 for id in dil {
                     match Card::from_id(id).await {
@@ -116,7 +116,7 @@ impl Deck {
             side,
         })
     }
-    fn read_deck_card_id(deck_text: String, deck_area: DeckArea) -> Result<Vec<u32>, String> {
+    fn read_deck_card_id(deck_text: &String, deck_area: DeckArea) -> Result<Vec<u32>, String> {
         let mut start_pos = 0;
         let mut end_pos = 0;
         match deck_area {
@@ -132,21 +132,21 @@ impl Deck {
                 if let Some(i) = deck_text.find("#extra") {
                     start_pos = i;
                 }
-                if let Some(i) = deck_text.find("#side") {
+                if let Some(i) = deck_text.find("!side") {
                     end_pos = i;
                 }
             }
             DeckArea::Side => {
-                if let Some(i) = deck_text.find("#side") {
+                if let Some(i) = deck_text.find("!side") {
                     start_pos = i;
+                    end_pos = deck_text.len();
                 }
-                end_pos = deck_text.len();
             }
         }
         if end_pos == 0 {
             return Err("读取的卡组文本不符合规则".to_string());
         }
-        let deck_area_text = &deck_text[start_pos..end_pos].trim();
+        let deck_area_text = deck_text[start_pos..end_pos].trim();
         let mut row_str_vec: Vec<&str> = deck_area_text.split("\n").collect();
         let mut card_id_vec = vec![];
         for row_str in &mut row_str_vec {
