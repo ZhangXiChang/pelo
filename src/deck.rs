@@ -1,4 +1,4 @@
-use std::{fs, io::Read};
+use std::{error, fs, io::Read};
 
 use regex::Regex;
 
@@ -15,31 +15,26 @@ pub struct Card {
 #[allow(dead_code)]
 impl Card {
     pub fn new(name: String) -> Self {
-        Self { id: 0, name }
+        Self {
+            id: Default::default(),
+            name,
+        }
     }
-    pub async fn from_id(id: u32) -> Result<Self, String> {
+    pub async fn from_id(id: u32) -> Result<Self, Box<dyn error::Error>> {
         let name;
-        match reqwest::get(format!("https://ygocdb.com/card/{}", id.to_string())).await {
-            Ok(r) => match r.text().await {
-                Ok(p) => {
-                    let name_regex;
-                    match Regex::new("<h2><span>(.*)</span>") {
-                        Ok(r) => name_regex = r,
-                        Err(e) => return Err(format!("{}", e)),
-                    }
-                    if let Some(captures) = name_regex.captures(&p) {
-                        if let Some(content) = captures.get(1) {
-                            name = content.as_str().to_string();
-                        } else {
-                            return Err("获取匹配的内容失败".to_string());
-                        }
-                    } else {
-                        return Err("获取捕获器失败".to_string());
-                    }
-                }
-                Err(e) => return Err(format!("{}", e)),
-            },
-            Err(e) => return Err(format!("{}", e)),
+        if let Some(captures) = Regex::new("<h2><span>(.*)</span>")?.captures(
+            &reqwest::get(format!("https://ygocdb.com/card/{}", id))
+                .await?
+                .text()
+                .await?,
+        ) {
+            if let Some(content) = captures.get(1) {
+                name = content.as_str().to_string();
+            } else {
+                return Err("获取匹配的内容失败".into());
+            }
+        } else {
+            return Err("获取捕获器失败".into());
         }
         Ok(Self { id, name })
     }
@@ -53,61 +48,24 @@ pub struct Deck {
 }
 #[allow(dead_code)]
 impl Deck {
-    pub fn new(name: String) -> Self {
-        Self {
-            name,
-            main: vec![],
-            extra: vec![],
-            side: vec![],
-        }
-    }
-    pub async fn from_file(name: String, file_path: String) -> Result<Self, String> {
+    pub async fn from_file(name: String, file_path: String) -> Result<Self, Box<dyn error::Error>> {
+        let mut file = fs::File::open(file_path)?;
         let mut deck_text = String::new();
-        match fs::File::open(file_path) {
-            Ok(mut f) => match f.read_to_string(&mut deck_text) {
-                Ok(_) => (),
-                Err(e) => return Err(format!("{}", e)),
-            },
-            Err(e) => return Err(format!("{}", e)),
-        }
-        Self::from_text(name, deck_text).await
+        file.read_to_string(&mut deck_text)?;
+        Ok(Self::from_text(name, deck_text).await?)
     }
-    pub async fn from_text(name: String, deck_text: String) -> Result<Self, String> {
+    async fn from_text(name: String, deck_text: String) -> Result<Self, Box<dyn error::Error>> {
         let mut main = vec![];
-        match Self::read_deck_card_id(&deck_text, DeckArea::Main) {
-            Ok(dil) => {
-                for id in dil {
-                    match Card::from_id(id).await {
-                        Ok(c) => main.push(c),
-                        Err(e) => return Err(e),
-                    }
-                }
-            }
-            Err(e) => return Err(e),
+        for id in Self::read_deck_card_id(&deck_text, DeckArea::Main)? {
+            main.push(Card::from_id(id).await?);
         }
         let mut extra = vec![];
-        match Self::read_deck_card_id(&deck_text, DeckArea::Extra) {
-            Ok(dil) => {
-                for id in dil {
-                    match Card::from_id(id).await {
-                        Ok(c) => extra.push(c),
-                        Err(e) => return Err(e),
-                    }
-                }
-            }
-            Err(e) => return Err(e),
+        for id in Self::read_deck_card_id(&deck_text, DeckArea::Extra)? {
+            extra.push(Card::from_id(id).await?);
         }
         let mut side = vec![];
-        match Self::read_deck_card_id(&deck_text, DeckArea::Side) {
-            Ok(dil) => {
-                for id in dil {
-                    match Card::from_id(id).await {
-                        Ok(c) => side.push(c),
-                        Err(e) => return Err(e),
-                    }
-                }
-            }
-            Err(e) => return Err(e),
+        for id in Self::read_deck_card_id(&deck_text, DeckArea::Side)? {
+            side.push(Card::from_id(id).await?);
         }
         Ok(Self {
             name,
@@ -116,7 +74,10 @@ impl Deck {
             side,
         })
     }
-    fn read_deck_card_id(deck_text: &String, deck_area: DeckArea) -> Result<Vec<u32>, String> {
+    fn read_deck_card_id(
+        deck_text: &String,
+        deck_area: DeckArea,
+    ) -> Result<Vec<u32>, Box<dyn error::Error>> {
         let mut start_pos = 0;
         let mut end_pos = 0;
         match deck_area {
@@ -144,12 +105,12 @@ impl Deck {
             }
         }
         if end_pos == 0 {
-            return Err("读取的卡组文本不符合规则".to_string());
+            return Err("读取的卡组文本不符合规则".into());
         }
         let deck_area_text = deck_text[start_pos..end_pos].trim();
-        let mut row_str_vec: Vec<&str> = deck_area_text.split("\n").collect();
-        let mut card_id_vec = vec![];
-        for row_str in &mut row_str_vec {
+        let mut row_str_list: Vec<&str> = deck_area_text.split("\n").collect();
+        let mut card_id_list = vec![];
+        for row_str in &mut row_str_list {
             //清理行后检查是否为纯数字
             *row_str = row_str.trim();
             let mut is_ascii_digit = true;
@@ -161,14 +122,17 @@ impl Deck {
             }
             //如果不为纯数字则跳过
             if is_ascii_digit {
-                let card_id;
-                match row_str.parse::<u32>() {
-                    Ok(id) => card_id = id,
-                    Err(e) => return Err(format!("{}", e)),
-                }
-                card_id_vec.push(card_id);
+                card_id_list.push(row_str.parse::<u32>()?);
             }
         }
-        Ok(card_id_vec)
+        Ok(card_id_list)
+    }
+    pub fn new(name: String) -> Self {
+        Self {
+            name,
+            main: Default::default(),
+            extra: Default::default(),
+            side: Default::default(),
+        }
     }
 }
