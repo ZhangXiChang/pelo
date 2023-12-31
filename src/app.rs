@@ -12,9 +12,14 @@ use ratatui::{
 
 use crate::deck::*;
 
+enum PopupState {
+    Show,
+    Hide,
+}
 enum Focus {
     MainMenu,
     SideMenu,
+    Popup,
 }
 enum MainMenuState {
     Root,
@@ -29,6 +34,21 @@ struct Points {
     width: f64,
     height: f64,
     points: Vec<(f64, f64)>,
+}
+
+struct Popup<'a> {
+    state: PopupState,
+    title: Span<'a>,
+    message: String,
+}
+impl<'a> Popup<'a> {
+    fn new(state: PopupState) -> Self {
+        Self {
+            state,
+            title: Default::default(),
+            message: Default::default(),
+        }
+    }
 }
 
 struct Menu<'a, T> {
@@ -51,6 +71,7 @@ impl<'a, T> Menu<'a, T> {
 pub struct App<'a> {
     is_run: bool,
     focus: Focus,
+    popup: Popup<'a>,
     main_menu: Menu<'a, MainMenuState>,
     side_menu: Menu<'a, SideMenuState>,
     kbn_points: Option<Points>,
@@ -86,6 +107,7 @@ impl<'a> App<'a> {
         Self {
             is_run: true,
             focus: Focus::MainMenu,
+            popup: Popup::new(PopupState::Hide),
             main_menu: Menu::new(MainMenuState::Root),
             side_menu: Menu::new(SideMenuState::Null),
             kbn_points: Default::default(),
@@ -161,7 +183,7 @@ impl<'a> App<'a> {
                             .clone()
                             .add_modifier(Modifier::REVERSED)
                     }
-                    Focus::SideMenu => (),
+                    _ => (),
                 }
                 match self.main_menu.state {
                     MainMenuState::Root => {
@@ -188,7 +210,6 @@ impl<'a> App<'a> {
                 //副菜单
                 self.side_menu.title = Span::from("副菜单");
                 match self.focus {
-                    Focus::MainMenu => (),
                     Focus::SideMenu => {
                         self.side_menu.title = self
                             .side_menu
@@ -196,6 +217,7 @@ impl<'a> App<'a> {
                             .clone()
                             .add_modifier(Modifier::REVERSED)
                     }
+                    _ => (),
                 }
                 match self.side_menu.state {
                     SideMenuState::Null => self.side_menu.items = vec![],
@@ -241,6 +263,17 @@ impl<'a> App<'a> {
                 }
             }
         }
+        match self.popup.state {
+            PopupState::Show => frame.render_widget(
+                Paragraph::new(self.popup.message.clone()).block(
+                    Block::new()
+                        .borders(Borders::ALL)
+                        .title(self.popup.title.clone()),
+                ),
+                frame.size(),
+            ),
+            PopupState::Hide => (),
+        }
         Ok(())
     }
     async fn input_process(&mut self, event: Event) -> Result<(), Box<dyn error::Error>> {
@@ -262,6 +295,7 @@ impl<'a> App<'a> {
                                 -1,
                             );
                         }
+                        _ => (),
                     },
                     KeyCode::Down => match self.focus {
                         Focus::MainMenu => {
@@ -278,10 +312,12 @@ impl<'a> App<'a> {
                                 1,
                             );
                         }
+                        _ => (),
                     },
                     KeyCode::Tab => match self.focus {
                         Focus::MainMenu => self.focus = Focus::SideMenu,
                         Focus::SideMenu => self.focus = Focus::MainMenu,
+                        _ => (),
                     },
                     KeyCode::Enter => match self.focus {
                         Focus::MainMenu => match self.main_menu.state {
@@ -314,6 +350,11 @@ impl<'a> App<'a> {
                         Focus::SideMenu => match self.side_menu.state {
                             SideMenuState::Null => (),
                             SideMenuState::SelectDeckFromFile => {
+                                self.focus = Focus::Popup;
+                                self.popup.state = PopupState::Show;
+                                self.popup.title =
+                                    Span::from("解析卡组").add_modifier(Modifier::BOLD);
+                                self.popup.message = "正在联网解析卡组中...".to_string();
                                 if let Some(i) = self.side_menu.items_state.selected() {
                                     self.deck = Some(
                                         Deck::from_file(
@@ -326,8 +367,11 @@ impl<'a> App<'a> {
                                         .await?,
                                     );
                                 }
+                                self.popup.state = PopupState::Hide;
+                                self.focus = Focus::SideMenu;
                             }
                         },
+                        Focus::Popup => (),
                     },
                     _ => (),
                 },
