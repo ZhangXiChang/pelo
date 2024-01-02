@@ -1,4 +1,4 @@
-use std::{error, fs, io, time};
+use std::{fs, io, time};
 
 use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
@@ -10,7 +10,7 @@ use ratatui::{
     widgets::{canvas::Canvas, *},
 };
 
-use crate::deck::*;
+use crate::{deck::*, error::Error};
 
 enum PopupState {
     Show,
@@ -89,7 +89,7 @@ impl<'a> App<'a> {
     fn query_dir_file_name_suffix(
         path: String,
         file_name_suffix: String,
-    ) -> Result<Vec<String>, Box<dyn error::Error>> {
+    ) -> Result<Vec<String>, Error> {
         let mut file_name_list = vec![];
         for dir_entry_result in fs::read_dir(path)? {
             let dir_entry = dir_entry_result?;
@@ -114,7 +114,7 @@ impl<'a> App<'a> {
             deck: Default::default(),
         }
     }
-    pub async fn run(mut self) -> Result<(), Box<dyn error::Error>> {
+    pub async fn run(mut self) -> Result<(), Error> {
         self.main_menu.items_state.select(Some(0));
         self.side_menu.items_state.select(Some(0));
         let gimg = image::open("./assets/texture/kbn.png")?.flipv().to_luma8();
@@ -149,7 +149,7 @@ impl<'a> App<'a> {
         disable_raw_mode()?;
         Ok(())
     }
-    fn draw(&mut self, frame: &mut Frame) -> Result<(), Box<dyn error::Error>> {
+    fn draw(&mut self, frame: &mut Frame) -> Result<(), Error> {
         let main_layout = Layout::new(
             Direction::Vertical,
             [Constraint::Length(3), Constraint::Min(0)],
@@ -276,7 +276,7 @@ impl<'a> App<'a> {
         }
         Ok(())
     }
-    async fn input_process(&mut self, event: Event) -> Result<(), Box<dyn error::Error>> {
+    async fn input_process(&mut self, event: Event) -> Result<(), Error> {
         match event {
             Event::Key(key) => match key.kind {
                 KeyEventKind::Press => match key.code {

@@ -1,9 +1,9 @@
-use std::error;
-
 use log4rs::{
     append::{console::ConsoleAppender, file::FileAppender},
     encode::pattern::PatternEncoder,
 };
+
+use crate::error::Error;
 
 pub enum LogRecordMode {
     Console,
@@ -35,7 +35,7 @@ impl LogRecord {
         self.log_file_path = Some(log_file_path);
         self
     }
-    pub fn start(self) -> Result<(), Box<dyn error::Error>> {
+    pub fn start(self) -> Result<(), Error> {
         let pattern_encoder = Box::new(PatternEncoder::new("[{d(%Y-%m-%d %H:%M:%S)}][{l}]:{m}{n}"));
         let log_config = match self.log_mode {
             LogRecordMode::Console => log4rs::Config::builder()

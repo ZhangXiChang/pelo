@@ -1,5 +1,6 @@
 mod app;
 mod deck;
+mod error;
 mod log_record;
 
 use std::process::exit;

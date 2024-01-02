@@ -1,6 +1,8 @@
-use std::{error, fs, io::Read};
+use std::{fs, io::Read};
 
 use regex::Regex;
+
+use crate::error::Error;
 
 enum DeckArea {
     Main,
@@ -20,7 +22,7 @@ impl Card {
             name,
         }
     }
-    pub async fn from_id(id: u32) -> Result<Self, Box<dyn error::Error>> {
+    pub async fn from_id(id: u32) -> Result<Self, Error> {
         let name;
         if let Some(captures) = Regex::new("<h2><span>(.*)</span>")?.captures(
             &reqwest::get(format!("https://ygocdb.com/card/{}", id))
@@ -48,13 +50,13 @@ pub struct Deck {
 }
 #[allow(dead_code)]
 impl Deck {
-    pub async fn from_file(name: String, file_path: String) -> Result<Self, Box<dyn error::Error>> {
+    pub async fn from_file(name: String, file_path: String) -> Result<Self, Error> {
         let mut file = fs::File::open(file_path)?;
         let mut deck_text = String::new();
         file.read_to_string(&mut deck_text)?;
         Ok(Self::from_text(name, deck_text).await?)
     }
-    async fn from_text(name: String, deck_text: String) -> Result<Self, Box<dyn error::Error>> {
+    async fn from_text(name: String, deck_text: String) -> Result<Self, Error> {
         let mut main = vec![];
         for id in Self::read_deck_card_id(&deck_text, DeckArea::Main)? {
             main.push(Card::from_id(id).await?);
@@ -74,10 +76,7 @@ impl Deck {
             side,
         })
     }
-    fn read_deck_card_id(
-        deck_text: &String,
-        deck_area: DeckArea,
-    ) -> Result<Vec<u32>, Box<dyn error::Error>> {
+    fn read_deck_card_id(deck_text: &String, deck_area: DeckArea) -> Result<Vec<u32>, Error> {
         let mut start_pos = 0;
         let mut end_pos = 0;
         match deck_area {
