@@ -61,10 +61,3 @@ impl From<ParseIntError> for Error {
         }
     }
 }
-impl From<tokio::task::JoinError> for Error {
-    fn from(value: tokio::task::JoinError) -> Self {
-        Self {
-            message: value.to_string(),
-        }
-    }
-}

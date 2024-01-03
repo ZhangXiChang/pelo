@@ -42,8 +42,9 @@ struct App<'a> {
     deck: Option<Deck>,
 }
 
-fn main() {
-    match run() {
+#[tokio::main]
+async fn main() {
+    match run().await {
         Ok(_) => (),
         Err(e) => {
             error!("{}", e);
@@ -51,7 +52,7 @@ fn main() {
         }
     }
 }
-fn run() -> Result<(), Error> {
+async fn run() -> Result<(), Error> {
     //初始化日志系统
     log4rs::init_config(
         log4rs::Config::builder()
@@ -109,7 +110,7 @@ fn run() -> Result<(), Error> {
     while app.is_run {
         //输入处理
         if event::poll(time::Duration::from_millis(0))? {
-            input_process(&mut app, event::read()?)?;
+            input_process(&mut app, event::read()?).await?;
         }
         //状态机
         state_machine(&mut app)?;
@@ -120,7 +121,7 @@ fn run() -> Result<(), Error> {
     disable_raw_mode()?;
     Ok(())
 }
-fn input_process(app: &mut App, event: Event) -> Result<(), Error> {
+async fn input_process(app: &mut App<'_>, event: Event) -> Result<(), Error> {
     match event {
         Event::Key(key) => match key.kind {
             KeyEventKind::Press => match key.code {
@@ -193,7 +194,7 @@ fn input_process(app: &mut App, event: Event) -> Result<(), Error> {
                             if let Some(i) = app.side_menu.items_state.selected() {
                                 app.deck = Some(
                                     Deck::from(
-                                        app.side_menu.items[i],
+                                        app.side_menu.items[i].clone(),
                                         DeckFromType::File(format!(
                                             "./assets/deck/{}.ydk",
                                             app.side_menu.items[i]
