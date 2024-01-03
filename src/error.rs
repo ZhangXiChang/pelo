@@ -1,4 +1,4 @@
-use std::{error, fmt, io};
+use std::{error, fmt, io, num::ParseIntError};
 
 use log::SetLoggerError;
 
@@ -35,6 +35,34 @@ impl From<SetLoggerError> for Error {
 }
 impl From<log4rs::config::runtime::ConfigErrors> for Error {
     fn from(value: log4rs::config::runtime::ConfigErrors) -> Self {
+        Self {
+            message: value.to_string(),
+        }
+    }
+}
+impl From<reqwest::Error> for Error {
+    fn from(value: reqwest::Error) -> Self {
+        Self {
+            message: value.to_string(),
+        }
+    }
+}
+impl From<regex::Error> for Error {
+    fn from(value: regex::Error) -> Self {
+        Self {
+            message: value.to_string(),
+        }
+    }
+}
+impl From<ParseIntError> for Error {
+    fn from(value: ParseIntError) -> Self {
+        Self {
+            message: value.to_string(),
+        }
+    }
+}
+impl From<tokio::task::JoinError> for Error {
+    fn from(value: tokio::task::JoinError) -> Self {
         Self {
             message: value.to_string(),
         }

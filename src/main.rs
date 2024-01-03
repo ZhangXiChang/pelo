@@ -1,3 +1,4 @@
+mod deck;
 mod error;
 
 use std::{fs, io, process::exit, time};
@@ -7,8 +8,9 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
+use deck::*;
 use error::*;
-use log::{debug, error};
+use log::error;
 use log4rs::{append::file::FileAppender, encode::pattern::PatternEncoder};
 use ratatui::{prelude::*, widgets::*};
 
@@ -37,6 +39,7 @@ struct App<'a> {
     focus: Focus,
     main_menu: Menu<'a, MainMenuState>,
     side_menu: Menu<'a, SideMenuState>,
+    deck: Option<Deck>,
 }
 
 fn main() {
@@ -96,6 +99,7 @@ fn run() -> Result<(), Error> {
             },
             items: vec![],
         },
+        deck: None,
     };
     //初始化终端
     io::stdout().execute(EnterAlternateScreen)?;
@@ -115,58 +119,6 @@ fn run() -> Result<(), Error> {
     io::stdout().execute(LeaveAlternateScreen)?;
     disable_raw_mode()?;
     Ok(())
-}
-fn terminal_gui(app: &mut App, frame: &mut Frame) {
-    //根布局
-    let root_layout = Layout::new(
-        Direction::Vertical,
-        [Constraint::Length(3), Constraint::Min(0)],
-    )
-    .split(frame.size());
-    {
-        //应用标题
-        frame.render_widget(
-            Paragraph::new(app.title.clone())
-                .block(Block::new().borders(Borders::ALL))
-                .alignment(Alignment::Center)
-                .add_modifier(Modifier::BOLD),
-            root_layout[0],
-        );
-        //内容布局
-        let content_layout = Layout::new(
-            Direction::Horizontal,
-            [Constraint::Length(21), Constraint::Min(0)],
-        )
-        .split(root_layout[1]);
-        {
-            //主菜单
-            frame.render_stateful_widget(
-                List::new(app.main_menu.items.clone())
-                    .block(
-                        Block::new()
-                            .borders(Borders::ALL)
-                            .title(app.main_menu.title.clone()),
-                    )
-                    .highlight_style(Style::new().add_modifier(Modifier::BOLD))
-                    .highlight_symbol(">> "),
-                content_layout[0],
-                &mut app.main_menu.items_state,
-            );
-            //副菜单
-            frame.render_stateful_widget(
-                List::new(app.side_menu.items.clone())
-                    .block(
-                        Block::new()
-                            .borders(Borders::ALL)
-                            .title(app.side_menu.title.clone()),
-                    )
-                    .highlight_style(Style::new().add_modifier(Modifier::BOLD))
-                    .highlight_symbol(">> "),
-                content_layout[1],
-                &mut app.side_menu.items_state,
-            );
-        }
-    }
 }
 fn input_process(app: &mut App, event: Event) -> Result<(), Error> {
     match event {
@@ -239,7 +191,16 @@ fn input_process(app: &mut App, event: Event) -> Result<(), Error> {
                         SideMenuState::Null => (),
                         SideMenuState::SelectDeckFromFile => {
                             if let Some(i) = app.side_menu.items_state.selected() {
-                                debug!("{:?}", app.side_menu.items[i]);
+                                app.deck = Some(
+                                    Deck::from(
+                                        app.side_menu.items[i],
+                                        DeckFromType::File(format!(
+                                            "./assets/deck/{}.ydk",
+                                            app.side_menu.items[i]
+                                        )),
+                                    )
+                                    .await?,
+                                )
                             }
                         }
                     },
@@ -287,6 +248,58 @@ fn state_machine(app: &mut App) -> Result<(), Error> {
         }
     }
     Ok(())
+}
+fn terminal_gui(app: &mut App, frame: &mut Frame) {
+    //根布局
+    let root_layout = Layout::new(
+        Direction::Vertical,
+        [Constraint::Length(3), Constraint::Min(0)],
+    )
+    .split(frame.size());
+    {
+        //应用标题
+        frame.render_widget(
+            Paragraph::new(app.title.clone())
+                .block(Block::new().borders(Borders::ALL))
+                .alignment(Alignment::Center)
+                .add_modifier(Modifier::BOLD),
+            root_layout[0],
+        );
+        //内容布局
+        let content_layout = Layout::new(
+            Direction::Horizontal,
+            [Constraint::Length(21), Constraint::Min(0)],
+        )
+        .split(root_layout[1]);
+        {
+            //主菜单
+            frame.render_stateful_widget(
+                List::new(app.main_menu.items.clone())
+                    .block(
+                        Block::new()
+                            .borders(Borders::ALL)
+                            .title(app.main_menu.title.clone()),
+                    )
+                    .highlight_style(Style::new().add_modifier(Modifier::BOLD))
+                    .highlight_symbol(">> "),
+                content_layout[0],
+                &mut app.main_menu.items_state,
+            );
+            //副菜单
+            frame.render_stateful_widget(
+                List::new(app.side_menu.items.clone())
+                    .block(
+                        Block::new()
+                            .borders(Borders::ALL)
+                            .title(app.side_menu.title.clone()),
+                    )
+                    .highlight_style(Style::new().add_modifier(Modifier::BOLD))
+                    .highlight_symbol(">> "),
+                content_layout[1],
+                &mut app.side_menu.items_state,
+            );
+        }
+    }
 }
 fn step_list_state(list_state: &mut ListState, item_len: usize, step_length: i64) {
     if let Some(i) = list_state.selected() {
