@@ -239,7 +239,7 @@ fn input_process(app: &mut App, event: Event) -> Result<(), Error> {
                         SideMenuState::Null => (),
                         SideMenuState::SelectDeckFromFile => {
                             if let Some(i) = app.side_menu.items_state.selected() {
-                                debug!("{}", i);
+                                debug!("{:?}", app.side_menu.items[i]);
                             }
                         }
                     },
