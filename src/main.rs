@@ -65,14 +65,14 @@ async fn run() -> Result<(), Error> {
                                 "[{d(%Y-%m-%d %H:%M:%S)}][{l}]:{m}{n}",
                             )))
                             .append(false)
-                            .build("./logs/latest.log")?,
+                            .build("./logs/error.log")?,
                     ),
                 ),
             )
             .build(
                 log4rs::config::Root::builder()
                     .appender("file_log")
-                    .build(log::LevelFilter::Trace),
+                    .build(log::LevelFilter::Error),
             )?,
     )?;
     //初始化应用程序
@@ -109,112 +109,114 @@ async fn run() -> Result<(), Error> {
     //主循环
     while app.is_run {
         //输入处理
-        if event::poll(time::Duration::from_millis(0))? {
-            input_process(&mut app, event::read()?).await?;
-        }
-        //状态机
-        state_machine(&mut app)?;
+        input_process(&mut app).await?;
         //终端绘制
-        terminal.draw(|frame| terminal_gui(&mut app, frame))?;
+        terminal_gui(&mut app, &mut terminal)?;
     }
     io::stdout().execute(LeaveAlternateScreen)?;
     disable_raw_mode()?;
     Ok(())
 }
-async fn input_process(app: &mut App<'_>, event: Event) -> Result<(), Error> {
-    match event {
-        Event::Key(key) => match key.kind {
-            KeyEventKind::Press => match key.code {
-                KeyCode::Up => match app.focus {
-                    Focus::MainMenu => {
-                        step_list_state(
-                            &mut app.main_menu.items_state,
-                            app.main_menu.items.len(),
-                            -1,
-                        );
-                    }
-                    Focus::SideMenu => {
-                        step_list_state(
-                            &mut app.side_menu.items_state,
-                            app.side_menu.items.len(),
-                            -1,
-                        );
-                    }
-                },
-                KeyCode::Down => match app.focus {
-                    Focus::MainMenu => {
-                        step_list_state(
-                            &mut app.main_menu.items_state,
-                            app.main_menu.items.len(),
-                            1,
-                        );
-                    }
-                    Focus::SideMenu => {
-                        step_list_state(
-                            &mut app.side_menu.items_state,
-                            app.side_menu.items.len(),
-                            1,
-                        );
-                    }
-                },
-                KeyCode::Tab => match app.focus {
-                    Focus::MainMenu => app.focus = Focus::SideMenu,
-                    Focus::SideMenu => app.focus = Focus::MainMenu,
-                },
-                KeyCode::Enter => match app.focus {
-                    Focus::MainMenu => match app.main_menu.state {
-                        MainMenuState::Root => {
-                            if let Some(i) = app.main_menu.items_state.selected() {
-                                match i {
-                                    0 => app.main_menu.state = MainMenuState::SelectDeck,
-                                    1 => app.is_run = false,
-                                    _ => (),
-                                }
-                            }
+async fn input_process(app: &mut App<'_>) -> Result<(), Error> {
+    if event::poll(time::Duration::from_millis(0))? {
+        match event::read()? {
+            Event::Key(key) => match key.kind {
+                KeyEventKind::Press => match key.code {
+                    KeyCode::Up => match app.focus {
+                        Focus::MainMenu => {
+                            step_list_state(
+                                &mut app.main_menu.items_state,
+                                app.main_menu.items.len(),
+                                -1,
+                            );
                         }
-                        MainMenuState::SelectDeck => {
-                            if let Some(i) = app.main_menu.items_state.selected() {
-                                match i {
-                                    0 => {
-                                        app.side_menu.state = SideMenuState::SelectDeckFromFile;
-                                        app.focus = Focus::SideMenu;
-                                    }
-                                    1 => {
-                                        app.main_menu.state = MainMenuState::Root;
-                                        app.side_menu.state = SideMenuState::Null;
-                                    }
-                                    _ => (),
-                                }
-                            }
+                        Focus::SideMenu => {
+                            step_list_state(
+                                &mut app.side_menu.items_state,
+                                app.side_menu.items.len(),
+                                -1,
+                            );
                         }
                     },
-                    Focus::SideMenu => match app.side_menu.state {
-                        SideMenuState::Null => (),
-                        SideMenuState::SelectDeckFromFile => {
-                            if let Some(i) = app.side_menu.items_state.selected() {
-                                app.deck = Some(
-                                    Deck::from(
-                                        app.side_menu.items[i].clone(),
-                                        DeckFromType::File(format!(
-                                            "./assets/deck/{}.ydk",
-                                            app.side_menu.items[i]
-                                        )),
+                    KeyCode::Down => match app.focus {
+                        Focus::MainMenu => {
+                            step_list_state(
+                                &mut app.main_menu.items_state,
+                                app.main_menu.items.len(),
+                                1,
+                            );
+                        }
+                        Focus::SideMenu => {
+                            step_list_state(
+                                &mut app.side_menu.items_state,
+                                app.side_menu.items.len(),
+                                1,
+                            );
+                        }
+                    },
+                    KeyCode::Tab => match app.focus {
+                        Focus::MainMenu => app.focus = Focus::SideMenu,
+                        Focus::SideMenu => app.focus = Focus::MainMenu,
+                    },
+                    KeyCode::Enter => match app.focus {
+                        Focus::MainMenu => match app.main_menu.state {
+                            MainMenuState::Root => {
+                                if let Some(i) = app.main_menu.items_state.selected() {
+                                    match i {
+                                        0 => app.main_menu.state = MainMenuState::SelectDeck,
+                                        1 => app.is_run = false,
+                                        _ => (),
+                                    }
+                                }
+                            }
+                            MainMenuState::SelectDeck => {
+                                if let Some(i) = app.main_menu.items_state.selected() {
+                                    match i {
+                                        0 => {
+                                            app.side_menu.state = SideMenuState::SelectDeckFromFile;
+                                            app.focus = Focus::SideMenu;
+                                        }
+                                        1 => {
+                                            app.main_menu.state = MainMenuState::Root;
+                                            app.side_menu.state = SideMenuState::Null;
+                                        }
+                                        _ => (),
+                                    }
+                                }
+                            }
+                        },
+                        Focus::SideMenu => match app.side_menu.state {
+                            SideMenuState::Null => (),
+                            SideMenuState::SelectDeckFromFile => {
+                                if let Some(i) = app.side_menu.items_state.selected() {
+                                    app.deck = Some(
+                                        Deck::from(
+                                            app.side_menu.items[i].clone(),
+                                            DeckFromType::File(format!(
+                                                "./assets/deck/{}.ydk",
+                                                app.side_menu.items[i]
+                                            )),
+                                        )
+                                        .await?,
                                     )
-                                    .await?,
-                                )
+                                }
                             }
-                        }
+                        },
                     },
+                    _ => (),
                 },
                 _ => (),
             },
             _ => (),
-        },
-        _ => (),
+        }
     }
     Ok(())
 }
-fn state_machine(app: &mut App) -> Result<(), Error> {
+fn terminal_gui(
+    app: &mut App<'_>,
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+) -> Result<(), Error> {
+    //状态处理
     match app.focus {
         Focus::MainMenu => {
             app.main_menu.title = app.main_menu.title.clone().add_modifier(Modifier::REVERSED);
@@ -248,9 +250,9 @@ fn state_machine(app: &mut App) -> Result<(), Error> {
                 query_dir_file_name_suffix("./assets/deck".to_string(), ".ydk".to_string())?;
         }
     }
-    Ok(())
-}
-fn terminal_gui(app: &mut App, frame: &mut Frame) {
+    //绘制
+    terminal.autoresize()?;
+    let mut frame = terminal.get_frame();
     //根布局
     let root_layout = Layout::new(
         Direction::Vertical,
@@ -301,6 +303,11 @@ fn terminal_gui(app: &mut App, frame: &mut Frame) {
             );
         }
     }
+    terminal.flush()?;
+    terminal.hide_cursor()?;
+    terminal.swap_buffers();
+    terminal.backend_mut().flush()?;
+    Ok(())
 }
 fn step_list_state(list_state: &mut ListState, item_len: usize, step_length: i64) {
     if let Some(i) = list_state.selected() {
