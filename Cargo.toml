@@ -6,8 +6,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.79"                                               #错误处理
 tokio = { version = "1.35.1", features = ["full"] }             #异步实现
-log = "0.4.20"                                                  #日志标记
-log4rs = "1.2.0"                                                #日志处理
+crossbeam-channel = "0.5.11"                                    #数据信道
 crossterm = { version = "0.27.0", features = ["event-stream"] } #终端控制
 ratatui = "0.25.0"                                              #终端绘制
 reqwest = { version = "0.11.23", features = ["json"] }          #HTTP请求

@@ -1,43 +1,48 @@
-use std::io;
+use anyhow::{Ok, Result};
+use crossbeam_channel::{unbounded, Receiver, Sender};
 
-use anyhow::Result;
-use crossterm::{
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-    ExecutableCommand,
-};
-use log4rs::{append::file::FileAppender, encode::pattern::PatternEncoder};
-use ratatui::prelude::*;
+#[allow(unused)]
+trait MessageHandling {
+    fn message_handling(&mut self, msg: (Sender<Message>, Receiver<Message>)) -> Result<()> {
+        Ok(())
+    }
+}
+
+#[allow(unused)]
+enum Message {
+    Quit,
+}
+
+struct App {
+    message: (Sender<Message>, Receiver<Message>),
+    systems: Vec<Box<dyn MessageHandling>>,
+}
+impl App {
+    fn new() -> Self {
+        Self {
+            message: unbounded(),
+            systems: vec![],
+        }
+    }
+    fn run(&mut self) -> Result<()> {
+        for system in &mut self.systems {
+            system.message_handling(self.message.clone())?;
+        }
+        self.message_handling(self.message.clone())?;
+        Ok(())
+    }
+}
+impl MessageHandling for App {
+    fn message_handling(&mut self, msg: (Sender<Message>, Receiver<Message>)) -> Result<()> {
+        match msg.1.recv()? {
+            Message::Quit => drop(msg),
+        }
+        Ok(())
+    }
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    //初始化日志系统
-    log4rs::init_config(
-        log4rs::Config::builder()
-            .appender(
-                log4rs::config::Appender::builder().build(
-                    "file_log",
-                    Box::new(
-                        FileAppender::builder()
-                            .encoder(Box::new(PatternEncoder::new(
-                                "[{d(%Y-%m-%d %H:%M:%S)}][{l}]:{m}{n}",
-                            )))
-                            .append(false)
-                            .build("./logs/error.log")?,
-                    ),
-                ),
-            )
-            .build(
-                log4rs::config::Root::builder()
-                    .appender("file_log")
-                    .build(log::LevelFilter::Error),
-            )?,
-    )?;
-    //初始化终端
-    io::stdout().execute(EnterAlternateScreen)?;
-    enable_raw_mode()?;
-    let mut _terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
-    //恢复终端
-    io::stdout().execute(LeaveAlternateScreen)?;
-    disable_raw_mode()?;
+    App::new().run()?;
     Ok(())
 }
