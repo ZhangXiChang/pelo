@@ -6,6 +6,7 @@ use regex::Regex;
 enum CardFromType {
     Id(u32),
 }
+#[allow(unused)]
 pub enum DeckFromType {
     Text(String),
     File(String),
@@ -16,6 +17,7 @@ enum DeckArea {
     Side,
 }
 
+#[allow(unused)]
 struct Card {
     id: u32,
     name: String,
@@ -46,6 +48,7 @@ impl Card {
     }
 }
 
+#[allow(unused)]
 pub struct Deck {
     name: String,
     main: Vec<Card>,
