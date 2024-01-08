@@ -1,15 +1,14 @@
 mod deck;
-mod error;
 
 use std::{fs, io, process::exit, time};
 
+use anyhow::Result;
 use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
 use deck::*;
-use error::*;
 use log::error;
 use log4rs::{append::file::FileAppender, encode::pattern::PatternEncoder};
 use ratatui::{prelude::*, widgets::*};
@@ -52,7 +51,7 @@ async fn main() {
         }
     }
 }
-async fn run() -> Result<(), Error> {
+async fn run() -> Result<()> {
     //初始化日志系统
     log4rs::init_config(
         log4rs::Config::builder()
@@ -117,7 +116,7 @@ async fn run() -> Result<(), Error> {
     disable_raw_mode()?;
     Ok(())
 }
-async fn input_process(app: &mut App<'_>) -> Result<(), Error> {
+async fn input_process(app: &mut App<'_>) -> Result<()> {
     if event::poll(time::Duration::from_millis(0))? {
         match event::read()? {
             Event::Key(key) => match key.kind {
@@ -215,7 +214,7 @@ async fn input_process(app: &mut App<'_>) -> Result<(), Error> {
 fn terminal_gui(
     app: &mut App<'_>,
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
-) -> Result<(), Error> {
+) -> Result<()> {
     //状态处理
     match app.focus {
         Focus::MainMenu => {
@@ -319,10 +318,7 @@ fn step_list_state(list_state: &mut ListState, item_len: usize, step_length: i64
         list_state.select(Some(0));
     }
 }
-fn query_dir_file_name_suffix(
-    path: String,
-    file_name_suffix: String,
-) -> Result<Vec<String>, Error> {
+fn query_dir_file_name_suffix(path: String, file_name_suffix: String) -> Result<Vec<String>> {
     let mut file_name_list = vec![];
     for dir_entry_result in fs::read_dir(path)? {
         let dir_entry = dir_entry_result?;

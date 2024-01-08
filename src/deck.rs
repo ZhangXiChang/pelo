@@ -1,8 +1,7 @@
 use std::{fs, io::Read};
 
+use anyhow::{anyhow, Result};
 use regex::Regex;
-
-use crate::error::Error;
 
 enum CardFromType {
     Id(u32),
@@ -22,7 +21,7 @@ struct Card {
     name: String,
 }
 impl Card {
-    async fn from(from_type: CardFromType) -> Result<Self, Error> {
+    async fn from(from_type: CardFromType) -> Result<Self> {
         match from_type {
             CardFromType::Id(id) => {
                 if let Some(captures) = Regex::new("<h2><span>(.*)</span>")?.captures(
@@ -37,10 +36,10 @@ impl Card {
                             name: content.as_str().to_string(),
                         });
                     } else {
-                        return Err("获取匹配的内容失败".into());
+                        return Err(anyhow!("获取匹配的内容失败"));
                     }
                 } else {
-                    return Err("获取捕获器失败".into());
+                    return Err(anyhow!("获取捕获器失败"));
                 }
             }
         }
@@ -54,7 +53,7 @@ pub struct Deck {
     side: Vec<Card>,
 }
 impl Deck {
-    pub async fn from(name: String, from_type: DeckFromType) -> Result<Self, Error> {
+    pub async fn from(name: String, from_type: DeckFromType) -> Result<Self> {
         let mut main = vec![];
         let mut extra = vec![];
         let mut side = vec![];
@@ -92,7 +91,7 @@ impl Deck {
             side,
         })
     }
-    fn read_deck_card_id(deck_text: &String, deck_area: DeckArea) -> Result<Vec<u32>, Error> {
+    fn read_deck_card_id(deck_text: &String, deck_area: DeckArea) -> Result<Vec<u32>> {
         let mut start_pos = 0;
         let mut end_pos = 0;
         match deck_area {
@@ -120,7 +119,7 @@ impl Deck {
             }
         }
         if end_pos == 0 {
-            return Err("读取的卡组文本不符合规则".into());
+            return Err(anyhow!("读取的卡组文本不符合规则"));
         }
         let deck_area_text = deck_text[start_pos..end_pos].trim();
         let mut row_str_list: Vec<&str> = deck_area_text.split("\n").collect();

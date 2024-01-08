@@ -4,20 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-#人机交互
-crossterm = "0.27.0"
-ratatui = "0.25.0"
-
-#性能
-tokio = { version = "1.35.1", features = ["full"] }
-
-#网络
-reqwest = { version = "0.11.23", features = ["json"] }
-
-#数据处理
-regex = "1.10.2"
-image = "0.24.7"
-
-#调试
-log = "0.4.20"
-log4rs = "1.2.0"
+anyhow = "1.0.79"                                      #错误处理
+tokio = { version = "1.35.1", features = ["full"] }    #异步实现
+log = "0.4.20"                                         #日志标记
+log4rs = "1.2.0"                                       #日志处理
+crossterm = "0.27.0"                                   #终端控制
+ratatui = "0.25.0"                                     #终端绘制
+reqwest = { version = "0.11.23", features = ["json"] } #HTTP请求
+regex = "1.10.2"                                       #正则表达式
+image = "0.24.7"                                       #图像处理
