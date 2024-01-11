@@ -1,69 +1,17 @@
-use std::{any::Any, time};
+mod app;
 
-use anyhow::{anyhow, Ok, Result};
-use crossbeam_channel::{unbounded, Receiver, Sender};
+use anyhow::{Ok, Result};
+use app::*;
+use crossbeam_channel::Sender;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::{prelude::*, widgets::*};
-
-trait ChannelComponent<T> {
-    fn register_channel(&mut self, channel: Channel<T>);
-}
-trait EventComponent {
-    fn event(&mut self, event: event::Event) -> Result<()>;
-}
-trait RenderComponent {
-    fn render(&mut self, frame: &mut Frame, area: Rect) -> Result<()>;
-}
-
-enum Message {
-    Quit,
-}
-
-struct Channel<T> {
-    smsg: Sender<T>,
-    rmsg: Receiver<T>,
-}
-impl<T> Channel<T> {
-    fn recv_pool(&mut self) -> Result<Option<T>> {
-        match self.rmsg.try_recv() {
-            core::result::Result::Ok(msg) => return Ok(Some(msg)),
-            Err(err) => match err {
-                crossbeam_channel::TryRecvError::Empty => return Ok(None),
-                crossbeam_channel::TryRecvError::Disconnected => {
-                    return Err(anyhow!("信道断开连接"))
-                }
-            },
-        }
-    }
-    fn send(&mut self, message: T) -> Result<()> {
-        match self.smsg.send(message) {
-            core::result::Result::Ok(_) => (),
-            Err(msg) => return Err(anyhow!("发送消息失败！消息：{}", msg)),
-        }
-        Ok(())
-    }
-}
-impl<T> Default for Channel<T> {
-    fn default() -> Self {
-        let (smsg, rmsg) = unbounded();
-        Self { smsg, rmsg }
-    }
-}
-impl<T> Clone for Channel<T> {
-    fn clone(&self) -> Self {
-        Self {
-            smsg: self.smsg.clone(),
-            rmsg: self.rmsg.clone(),
-        }
-    }
-}
 
 #[derive(Default)]
 struct Menu {
     title: String,
     items: Vec<String>,
     selected_items: ListState,
-    channel: Channel<Message>,
+    msg: Option<Sender<Message>>,
 }
 impl Menu {
     fn set_title(mut self, title: String) -> Self {
@@ -80,8 +28,14 @@ impl Menu {
     }
 }
 impl ChannelComponent<Message> for Menu {
-    fn register_channel(&mut self, channel: Channel<Message>) {
-        self.channel = channel;
+    fn register_send_channel(&mut self, send_channel: Sender<Message>) {
+        self.msg = Some(send_channel);
+    }
+    fn message(&mut self, msg: Message) -> Result<()> {
+        match msg {
+            _ => (),
+        }
+        Ok(())
     }
 }
 impl EventComponent for Menu {
@@ -89,6 +43,11 @@ impl EventComponent for Menu {
         match event {
             Event::Key(key) => match key.kind {
                 KeyEventKind::Press => match key.code {
+                    KeyCode::Esc => {
+                        if let Some(msg) = &self.msg {
+                            msg.send(Message::Quit)?
+                        }
+                    }
                     KeyCode::Up => {
                         if let Some(i) = self.selected_items.selected() {
                             if i > 0 {
@@ -111,7 +70,11 @@ impl EventComponent for Menu {
                         if let Some(i) = self.selected_items.selected() {
                             match i {
                                 0 => (),
-                                1 => self.channel.send(Message::Quit)?,
+                                1 => {
+                                    if let Some(msg) = &self.msg {
+                                        msg.send(Message::Quit)?
+                                    }
+                                }
                                 _ => (),
                             }
                         }
@@ -139,55 +102,9 @@ impl RenderComponent for Menu {
     }
 }
 
-#[derive(Default)]
-struct App {
-    channel: Channel<Message>,
-    components: Vec<Box<dyn Any + Send + Sync>>,
-}
-impl App {
-    // fn set_component(mut self, components: Vec<Box<dyn Any>>) -> Self {
-    //     self.components = components;
-    //     self
-    // }
-    fn run(&mut self) -> Result<()> {
-        for component in &mut self.components {
-            let mut async_loop_channel = self.channel.clone();
-            tokio::spawn(async move {
-                loop {
-                    if event::poll(time::Duration::from_millis(0))? {
-                        if let Some(event_component) =
-                            component.downcast_mut::<Box<dyn EventComponent>>()
-                        {
-                            event_component.event(event::read()?)?;
-                        }
-                        match event::read()? {
-                            event::Event::Key(_) => async_loop_channel.send(Message::Quit)?,
-                            _ => (),
-                        }
-                    }
-                    if let Some(msg) = async_loop_channel.recv_pool()? {
-                        match msg {
-                            Message::Quit => break,
-                        }
-                    }
-                }
-                Ok(())
-            });
-        }
-        let mut main_loop_channel = self.channel.clone();
-        loop {
-            if let Some(msg) = main_loop_channel.recv_pool()? {
-                match msg {
-                    Message::Quit => break,
-                }
-            }
-        }
-        Ok(())
-    }
-}
-
-#[tokio::main]
-async fn main() -> Result<()> {
-    App::default().run()?;
+fn main() -> Result<()> {
+    App::default()
+        .set_components(vec![Box::new(Menu::default())])
+        .run()?;
     Ok(())
 }
