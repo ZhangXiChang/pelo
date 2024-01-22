@@ -1,14 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
-use crossterm::event::{Event, KeyCode, KeyEventKind};
-use ratatui::{
-    layout::Rect,
-    style::{Modifier, Style, Stylize},
-    text::Span,
-    widgets::{Block, Borders, List, ListState},
-    Frame,
-};
+use ratatui::{prelude::*, widgets::*};
 
 mod system;
 use system::*;
@@ -99,11 +92,17 @@ impl SystemComponent for Menu<'_> {
 #[tokio::main]
 async fn main() -> Result<()> {
     System::nwe(SystemInfo {
-        system_components: vec![Box::new(Menu::new(MenuInfo {
-            title: "主菜单",
-            items: vec!["开始", "结束"],
-            items_selected: Some(0),
-        }))],
+        system_components: vec![
+            Box::new(Menu::new(MenuInfo {
+                title: "主菜单",
+                items: vec!["开始", "结束"],
+                items_selected: Some(0),
+            })),
+            // Box::new(Menu::new(MenuInfo {
+            //     title: "副菜单",
+            //     ..Default::default()
+            // })),
+        ],
     })
     .run()?;
     Ok(())

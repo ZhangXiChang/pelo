@@ -13,6 +13,8 @@ use crossterm::{
 use ratatui::{backend::CrosstermBackend, layout::Rect, Frame, Terminal};
 
 pub type Event = event::Event;
+pub type KeyCode = event::KeyCode;
+pub type KeyEventKind = event::KeyEventKind;
 
 #[allow(unused)]
 pub trait SystemComponent: Send {
