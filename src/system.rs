@@ -56,6 +56,20 @@ impl<'a> Menu<'a> {
     fn select_item(&mut self, selected: Option<usize>) {
         self.items_state.select(selected);
     }
+    fn select_last_item(&mut self) {
+        if let Some(item_index) = self.items_state.selected() {
+            if item_index > 0 {
+                self.select_item(Some(item_index - 1));
+            }
+        }
+    }
+    fn select_next_item(&mut self) {
+        if let Some(item_index) = self.items_state.selected() {
+            if item_index < self.items.len() - 1 {
+                self.select_item(Some(item_index + 1));
+            }
+        }
+    }
 }
 impl SystemComponent for Menu<'_> {
     fn register_system(&mut self, system: Arc<Mutex<System>>) {
@@ -84,6 +98,8 @@ impl EventComponent for Menu<'_> {
                             system.lock().unwrap().is_run = false;
                         }
                     }
+                    KeyCode::Up => self.select_last_item(),
+                    KeyCode::Down => self.select_next_item(),
                     _ => (),
                 },
                 _ => (),
@@ -115,33 +131,31 @@ impl System {
         io::stdout().execute(EnterAlternateScreen)?;
         enable_raw_mode()?;
         let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
-        let mut widgets = vec![Menu::new(MenuInfo {
+        let widgets = vec![Arc::new(Mutex::new(Menu::new(MenuInfo {
             title: "主菜单",
             items: vec!["开始", "结束"],
             items_selected: Some(0),
-        })];
-        for widget in widgets.iter_mut() {
-            widget.register_system(system.clone());
+        })))];
+        for widget in widgets.clone() {
+            widget.lock().unwrap().register_system(system.clone());
         }
-        let widgets = Arc::new(Mutex::new(widgets));
         while system.lock().unwrap().is_run {
             let mut event = None;
             if event::poll(time::Duration::from_millis(0))? {
                 event = Some(event::read()?);
             }
-            let widgets_clone = widgets.clone();
-            tokio::spawn(async move {
-                if let Some(event) = event {
-                    for widget in widgets_clone.lock().unwrap().iter_mut() {
-                        widget.event(event.clone());
-                    }
+            if let Some(event) = event {
+                for widget in widgets.clone() {
+                    let event = event.clone();
+                    tokio::spawn(async move {
+                        widget.lock().unwrap().event(event);
+                        anyhow::Ok(())
+                    });
                 }
-                anyhow::Ok(())
-            });
-            let widgets_clone = widgets.clone();
-            terminal.draw(move |frame| {
-                for widget in widgets_clone.lock().unwrap().iter_mut() {
-                    widget.render(frame, frame.size());
+            }
+            terminal.draw(|frame| {
+                for widget in widgets.clone() {
+                    widget.lock().unwrap().render(frame, frame.size());
                 }
             })?;
         }
