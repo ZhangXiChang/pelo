@@ -6,15 +6,15 @@ use std::{
 
 use anyhow::Result;
 use crossterm::{
-    event::{self},
+    event::{self, Event},
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
-use ratatui::{backend::CrosstermBackend, layout::Rect, Frame, Terminal};
-
-pub type Event = event::Event;
-pub type KeyCode = event::KeyCode;
-pub type KeyEventKind = event::KeyEventKind;
+use ratatui::{
+    backend::CrosstermBackend,
+    layout::{Constraint, Direction, Layout, Rect},
+    Frame, Terminal,
+};
 
 #[allow(unused)]
 pub trait SystemComponent: Send {
@@ -29,7 +29,7 @@ pub struct SystemInfo {
 impl Default for SystemInfo {
     fn default() -> Self {
         Self {
-            system_components: vec![],
+            system_components: Default::default(),
         }
     }
 }
@@ -76,8 +76,17 @@ impl System {
                 }
             }
             terminal.draw(|frame| {
-                for system_component in system.lock().unwrap().system_components.clone() {
-                    system_component.lock().unwrap().render(frame, frame.size());
+                let root_layout = Layout::new(
+                    Direction::Horizontal,
+                    [Constraint::Length(21), Constraint::Min(0)],
+                )
+                .split(frame.size());
+                let system_components = system.lock().unwrap().system_components.clone();
+                for i in 0..system_components.len() {
+                    system_components[i]
+                        .lock()
+                        .unwrap()
+                        .render(frame, root_layout[i]);
                 }
             })?;
         }
