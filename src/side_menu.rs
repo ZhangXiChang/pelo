@@ -9,8 +9,9 @@ use ratatui::{prelude::*, widgets::*};
 use crate::system::*;
 
 pub struct SideMenu {
-    pub title: String,
-    items: Vec<String>,
+    title: String,
+    title_style: Modifier,
+    pub items: Vec<String>,
     items_state: ListState,
     system: Option<Arc<Mutex<System>>>,
 }
@@ -18,25 +19,23 @@ impl SideMenu {
     pub fn new() -> Self {
         Self {
             title: "副菜单".to_string(),
+            title_style: Modifier::default(),
             items: vec![],
             items_state: ListState::default(),
             system: None,
         }
     }
-    fn select_item(&mut self, selected: Option<usize>) {
-        self.items_state.select(selected);
-    }
     fn select_last_item(&mut self) {
         if let Some(item_index) = self.items_state.selected() {
             if item_index > 0 {
-                self.select_item(Some(item_index - 1));
+                self.items_state.select(Some(item_index - 1));
             }
         }
     }
     fn select_next_item(&mut self) {
         if let Some(item_index) = self.items_state.selected() {
             if item_index < self.items.len() - 1 {
-                self.select_item(Some(item_index + 1));
+                self.items_state.select(Some(item_index + 1));
             }
         }
     }
@@ -71,7 +70,11 @@ impl SystemComponent for SideMenu {
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         frame.render_stateful_widget(
             List::new(self.items.clone())
-                .block(Block::new().borders(Borders::ALL).title(self.title.clone()))
+                .block(
+                    Block::new()
+                        .borders(Borders::ALL)
+                        .title(self.title.clone().add_modifier(self.title_style)),
+                )
                 .highlight_style(Style::new().add_modifier(Modifier::BOLD))
                 .highlight_symbol(">> "),
             area,

@@ -10,6 +10,7 @@ use crate::{side_menu::*, system::*};
 
 pub struct MainMenu {
     title: String,
+    title_style: Modifier,
     items: Vec<String>,
     items_state: ListState,
     system: Option<Arc<Mutex<System>>>,
@@ -18,6 +19,7 @@ impl MainMenu {
     pub fn new() -> Self {
         Self {
             title: "主菜单".to_string(),
+            title_style: Modifier::REVERSED,
             items: vec!["开始".to_string(), "结束".to_string()],
             items_state: {
                 let mut list_state = ListState::default();
@@ -27,20 +29,17 @@ impl MainMenu {
             system: None,
         }
     }
-    fn select_item(&mut self, selected: Option<usize>) {
-        self.items_state.select(selected);
-    }
     fn select_last_item(&mut self) {
         if let Some(item_index) = self.items_state.selected() {
             if item_index > 0 {
-                self.select_item(Some(item_index - 1));
+                self.items_state.select(Some(item_index - 1));
             }
         }
     }
     fn select_next_item(&mut self) {
         if let Some(item_index) = self.items_state.selected() {
             if item_index < self.items.len() - 1 {
-                self.select_item(Some(item_index + 1));
+                self.items_state.select(Some(item_index + 1));
             }
         }
     }
@@ -62,19 +61,23 @@ impl SystemComponent for MainMenu {
                         if let Some(selected) = self.items_state.selected() {
                             match selected {
                                 0 => {
-                                    self.system
+                                    if let Some(side_menu) = self
+                                        .system
                                         .as_ref()
                                         .unwrap()
                                         .lock()
                                         .unwrap()
-                                        .query(1)
+                                        .query_by_index(1)
+                                        .unwrap()
                                         .lock()
                                         .unwrap()
                                         .public()
                                         .unwrap()
                                         .downcast_mut::<SideMenu>()
-                                        .unwrap()
-                                        .title = "测试".to_string();
+                                    {
+                                        side_menu.items =
+                                            vec!["你好".to_string(), "世界".to_string()];
+                                    }
                                 }
                                 1 => self.system.as_ref().unwrap().lock().unwrap().quit(),
                                 _ => (),
@@ -91,7 +94,11 @@ impl SystemComponent for MainMenu {
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         frame.render_stateful_widget(
             List::new(self.items.clone())
-                .block(Block::new().borders(Borders::ALL).title(self.title.clone()))
+                .block(
+                    Block::new()
+                        .borders(Borders::ALL)
+                        .title(self.title.clone().add_modifier(self.title_style)),
+                )
                 .highlight_style(Style::new().add_modifier(Modifier::BOLD))
                 .highlight_symbol(">> "),
             area,

@@ -101,7 +101,7 @@ impl System {
     pub fn quit(&mut self) {
         self.is_run = false;
     }
-    pub fn query(&mut self, index: usize) -> Arc<Mutex<Box<dyn SystemComponent>>> {
-        self.system_components[index].clone()
+    pub fn query_by_index(&mut self, index: usize) -> Option<Arc<Mutex<Box<dyn SystemComponent>>>> {
+        self.system_components.get(index).cloned()
     }
 }
