@@ -1,20 +1,23 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    any::Any,
+    sync::{Arc, Mutex},
+};
 
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude::*, widgets::*};
 
 use crate::system::*;
 
-pub struct SideMenu<'a> {
-    title: Span<'a>,
-    items: Vec<&'a str>,
+pub struct SideMenu {
+    pub title: String,
+    items: Vec<String>,
     items_state: ListState,
     system: Option<Arc<Mutex<System>>>,
 }
-impl<'a> SideMenu<'a> {
+impl SideMenu {
     pub fn new() -> Self {
         Self {
-            title: "副菜单".add_modifier(Modifier::REVERSED),
+            title: "副菜单".to_string(),
             items: vec![],
             items_state: ListState::default(),
             system: None,
@@ -38,7 +41,10 @@ impl<'a> SideMenu<'a> {
         }
     }
 }
-impl SystemComponent for SideMenu<'_> {
+impl SystemComponent for SideMenu {
+    fn public(&mut self) -> Option<&mut dyn Any> {
+        Some(self)
+    }
     fn register_system(&mut self, system: Arc<Mutex<System>>) {
         self.system = Some(system);
     }

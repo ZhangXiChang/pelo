@@ -1,21 +1,24 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    any::Any,
+    sync::{Arc, Mutex},
+};
 
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude::*, widgets::*};
 
-use crate::system::*;
+use crate::{side_menu::*, system::*};
 
-pub struct MainMenu<'a> {
-    title: Span<'a>,
-    items: Vec<&'a str>,
+pub struct MainMenu {
+    title: String,
+    items: Vec<String>,
     items_state: ListState,
     system: Option<Arc<Mutex<System>>>,
 }
-impl<'a> MainMenu<'a> {
+impl MainMenu {
     pub fn new() -> Self {
         Self {
-            title: "主菜单".add_modifier(Modifier::REVERSED),
-            items: vec!["开始", "结束"],
+            title: "主菜单".to_string(),
+            items: vec!["开始".to_string(), "结束".to_string()],
             items_state: {
                 let mut list_state = ListState::default();
                 list_state.select(Some(0));
@@ -42,7 +45,10 @@ impl<'a> MainMenu<'a> {
         }
     }
 }
-impl SystemComponent for MainMenu<'_> {
+impl SystemComponent for MainMenu {
+    fn public(&mut self) -> Option<&mut dyn Any> {
+        Some(self)
+    }
     fn register_system(&mut self, system: Arc<Mutex<System>>) {
         self.system = Some(system);
     }
@@ -55,12 +61,22 @@ impl SystemComponent for MainMenu<'_> {
                     KeyCode::Enter => {
                         if let Some(selected) = self.items_state.selected() {
                             match selected {
-                                0 => (),
-                                1 => {
-                                    if let Some(system) = &mut self.system {
-                                        system.lock().unwrap().quit();
-                                    }
+                                0 => {
+                                    self.system
+                                        .as_ref()
+                                        .unwrap()
+                                        .lock()
+                                        .unwrap()
+                                        .query(1)
+                                        .lock()
+                                        .unwrap()
+                                        .public()
+                                        .unwrap()
+                                        .downcast_mut::<SideMenu>()
+                                        .unwrap()
+                                        .title = "测试".to_string();
                                 }
+                                1 => self.system.as_ref().unwrap().lock().unwrap().quit(),
                                 _ => (),
                             }
                         }

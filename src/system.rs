@@ -1,4 +1,5 @@
 use std::{
+    any::Any,
     io,
     sync::{Arc, Mutex},
     time,
@@ -18,6 +19,9 @@ use ratatui::{
 
 #[allow(unused)]
 pub trait SystemComponent: Send {
+    fn public(&mut self) -> Option<&mut dyn Any> {
+        None
+    }
     fn register_system(&mut self, system: Arc<Mutex<System>>) {}
     fn event(&mut self, event: Event) {}
     fn render(&mut self, frame: &mut Frame, area: Rect) {}
@@ -96,5 +100,8 @@ impl System {
     }
     pub fn quit(&mut self) {
         self.is_run = false;
+    }
+    pub fn query(&mut self, index: usize) -> Arc<Mutex<Box<dyn SystemComponent>>> {
+        self.system_components[index].clone()
     }
 }
