@@ -40,7 +40,7 @@ impl SideMenu {
         }
     }
 }
-impl SystemComponent for SideMenu {
+impl WidgetComponent for SideMenu {
     fn public(&mut self) -> Option<&mut dyn Any> {
         Some(self)
     }
