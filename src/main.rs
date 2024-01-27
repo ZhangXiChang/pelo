@@ -1,17 +1,22 @@
 use anyhow::Result;
 
 mod main_menu;
-mod side_menu;
+// mod side_menu;
 mod system;
 
 use main_menu::*;
-use side_menu::*;
+use ratatui::layout::{Constraint, Direction, Layout};
+// use side_menu::*;
 use system::*;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     System::nwe(SystemInfo {
-        system_components: vec![Box::new(MainMenu::new()), Box::new(SideMenu::new())],
+        components: vec![Box::new(WidgetLayout {
+            layout: Layout::new(Direction::Vertical, [Constraint::Min(0)]),
+            widgets: vec![Widget::new(Box::new(MainMenu::new()), 0)],
+            ..Default::default()
+        })],
     })
     .run()?;
     Ok(())

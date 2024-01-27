@@ -13,12 +13,17 @@ use crossterm::{
 };
 use ratatui::{
     backend::CrosstermBackend,
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Layout, Rect},
     Frame, Terminal,
 };
 
-#[allow(unused)]
 pub trait SystemComponent: Send {
+    fn as_widget_layout(&mut self) -> Option<&mut WidgetLayout> {
+        None
+    }
+}
+#[allow(unused)]
+pub trait WidgetComponent: Send {
     fn public(&mut self) -> Option<&mut dyn Any> {
         None
     }
@@ -27,30 +32,50 @@ pub trait SystemComponent: Send {
     fn render(&mut self, frame: &mut Frame, area: Rect) {}
 }
 
-pub struct SystemInfo {
-    pub system_components: Vec<Box<dyn SystemComponent>>,
+pub struct Widget {
+    pub component: Arc<Mutex<Box<dyn WidgetComponent>>>,
+    pub layout_area_index: usize,
 }
-impl Default for SystemInfo {
-    fn default() -> Self {
+impl Widget {
+    pub fn new(component: Box<dyn WidgetComponent>, layout_area_index: usize) -> Self {
         Self {
-            system_components: Default::default(),
+            component: Arc::new(Mutex::new(component)),
+            layout_area_index,
         }
     }
 }
+#[derive(Default)]
+pub struct WidgetLayout {
+    pub layout: Layout,
+    pub widgets: Vec<Widget>,
+    pub super_layout_area_index: Option<usize>,
+    pub sub_layout: Option<Vec<Box<WidgetLayout>>>,
+}
+impl SystemComponent for WidgetLayout {
+    fn as_widget_layout(&mut self) -> Option<&mut WidgetLayout> {
+        Some(self)
+    }
+}
+
+#[derive(Default)]
+pub struct SystemInfo {
+    pub components: Vec<Box<dyn SystemComponent>>,
+}
 pub struct System {
     is_run: bool,
-    system_components: Vec<Arc<Mutex<Box<dyn SystemComponent>>>>,
+    components: Vec<Arc<Mutex<Box<dyn SystemComponent>>>>,
 }
+#[allow(unused)]
 impl System {
     pub fn nwe(info: SystemInfo) -> Self {
         Self {
             is_run: true,
-            system_components: {
-                let mut system_components = vec![];
-                for system_component in info.system_components {
-                    system_components.push(Arc::new(Mutex::new(system_component)));
+            components: {
+                let mut components = vec![];
+                for component in info.components {
+                    components.push(Arc::new(Mutex::new(component)));
                 }
-                system_components
+                components
             },
         }
     }
@@ -59,40 +84,38 @@ impl System {
         io::stdout().execute(EnterAlternateScreen)?;
         enable_raw_mode()?;
         let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
-        for system_component in system.lock().unwrap().system_components.clone() {
-            system_component
-                .lock()
-                .unwrap()
-                .register_system(system.clone());
+        let mut components;
+        {
+            components = system.lock().unwrap().components.clone();
         }
-        while system.lock().unwrap().is_run {
-            let mut event = None;
-            if event::poll(time::Duration::from_millis(0))? {
-                event = Some(event::read()?);
-            }
-            if let Some(event) = event {
-                for system_component in system.lock().unwrap().system_components.clone() {
-                    let event = event.clone();
-                    tokio::spawn(async move {
-                        system_component.lock().unwrap().event(event);
-                        anyhow::Ok(())
-                    });
-                }
-            }
-            terminal.draw(|frame| {
-                let root_layout = Layout::new(
-                    Direction::Horizontal,
-                    [Constraint::Length(21), Constraint::Min(0)],
-                )
-                .split(frame.size());
-                let system_components = system.lock().unwrap().system_components.clone();
-                for i in 0..system_components.len() {
-                    system_components[i]
+        for component in &mut components {
+            if let Some(widget_layout) = component.lock().unwrap().as_widget_layout() {
+                for widget in &widget_layout.widgets {
+                    widget
+                        .component
                         .lock()
                         .unwrap()
-                        .render(frame, root_layout[i]);
+                        .register_system(system.clone());
                 }
-            })?;
+            }
+        }
+        while system.lock().unwrap().is_run {
+            for component in &mut components {
+                if let Some(widget_layout) = component.lock().unwrap().as_widget_layout() {
+                    for widget in &widget_layout.widgets {
+                        if event::poll(time::Duration::from_millis(0))? {
+                            let widget = widget.component.clone();
+                            tokio::spawn(async move {
+                                widget.lock().unwrap().event(event::read()?);
+                                anyhow::Ok(())
+                            });
+                        }
+                        terminal.draw(|frame| {
+                            widget.component.lock().unwrap().render(frame, frame.size());
+                        })?;
+                    }
+                }
+            }
         }
         disable_raw_mode()?;
         io::stdout().execute(LeaveAlternateScreen)?;
@@ -100,8 +123,5 @@ impl System {
     }
     pub fn quit(&mut self) {
         self.is_run = false;
-    }
-    pub fn query_by_index(&mut self, index: usize) -> Option<Arc<Mutex<Box<dyn SystemComponent>>>> {
-        self.system_components.get(index).cloned()
     }
 }

@@ -11,7 +11,7 @@ use crate::system::*;
 pub struct SideMenu {
     title: String,
     title_style: Modifier,
-    pub items: Vec<String>,
+    items: Vec<String>,
     items_state: ListState,
     system: Option<Arc<Mutex<System>>>,
 }

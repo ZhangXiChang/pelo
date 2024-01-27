@@ -6,7 +6,7 @@ use std::{
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude::*, widgets::*};
 
-use crate::{side_menu::*, system::*};
+use crate::system::*;
 
 pub struct MainMenu {
     title: String,
@@ -44,7 +44,7 @@ impl MainMenu {
         }
     }
 }
-impl SystemComponent for MainMenu {
+impl WidgetComponent for MainMenu {
     fn public(&mut self) -> Option<&mut dyn Any> {
         Some(self)
     }
@@ -61,23 +61,23 @@ impl SystemComponent for MainMenu {
                         if let Some(selected) = self.items_state.selected() {
                             match selected {
                                 0 => {
-                                    if let Some(side_menu) = self
-                                        .system
-                                        .as_ref()
-                                        .unwrap()
-                                        .lock()
-                                        .unwrap()
-                                        .query_by_index(1)
-                                        .unwrap()
-                                        .lock()
-                                        .unwrap()
-                                        .public()
-                                        .unwrap()
-                                        .downcast_mut::<SideMenu>()
-                                    {
-                                        side_menu.items =
-                                            vec!["你好".to_string(), "世界".to_string()];
-                                    }
+                                    // if let Some(side_menu) = self
+                                    //     .system
+                                    //     .as_ref()
+                                    //     .unwrap()
+                                    //     .lock()
+                                    //     .unwrap()
+                                    //     .query_by_index(1)
+                                    //     .unwrap()
+                                    //     .lock()
+                                    //     .unwrap()
+                                    //     .public()
+                                    //     .unwrap()
+                                    //     .downcast_mut::<SideMenu>()
+                                    // {
+                                    //     side_menu.items =
+                                    //         vec!["你好".to_string(), "世界".to_string()];
+                                    // }
                                 }
                                 1 => self.system.as_ref().unwrap().lock().unwrap().quit(),
                                 _ => (),
