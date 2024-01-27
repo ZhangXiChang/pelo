@@ -12,7 +12,7 @@ use crossterm::{
     ExecutableCommand,
 };
 use ratatui::{
-    backend::CrosstermBackend,
+    backend::{Backend, CrosstermBackend},
     layout::{Layout, Rect},
     Frame, Terminal,
 };
@@ -48,7 +48,7 @@ impl Widget {
 pub struct WidgetLayout {
     pub layout: Layout,
     pub widgets: Vec<Widget>,
-    pub super_layout_area_index: Option<usize>,
+    pub super_layout_area_index: usize,
     pub sub_layout: Option<Vec<Box<WidgetLayout>>>,
 }
 impl SystemComponent for WidgetLayout {
@@ -102,6 +102,8 @@ impl System {
         while system.lock().unwrap().is_run {
             for component in &mut components {
                 if let Some(widget_layout) = component.lock().unwrap().as_widget_layout() {
+                    terminal.autoresize()?;
+                    let layout_area = widget_layout.layout.split(terminal.get_frame().size());
                     for widget in &widget_layout.widgets {
                         if event::poll(time::Duration::from_millis(0))? {
                             let widget = widget.component.clone();
@@ -110,10 +112,15 @@ impl System {
                                 anyhow::Ok(())
                             });
                         }
-                        terminal.draw(|frame| {
-                            widget.component.lock().unwrap().render(frame, frame.size());
-                        })?;
+                        widget.component.lock().unwrap().render(
+                            &mut terminal.get_frame(),
+                            layout_area[widget.layout_area_index],
+                        );
                     }
+                    terminal.flush()?;
+                    terminal.hide_cursor()?;
+                    terminal.swap_buffers();
+                    terminal.backend_mut().flush()?;
                 }
             }
         }
