@@ -102,16 +102,18 @@ impl System {
         while system.lock().unwrap().is_run {
             for component in &mut components {
                 if let Some(widget_layout) = component.lock().unwrap().as_widget_layout() {
-                    terminal.autoresize()?;
-                    let layout_area = widget_layout.layout.split(terminal.get_frame().size());
                     for widget in &widget_layout.widgets {
-                        let widget_async = widget.component.clone();
+                        let widget = widget.component.clone();
                         tokio::spawn(async move {
                             if event::poll(time::Duration::from_millis(0))? {
-                                widget_async.lock().unwrap().event(event::read()?);
+                                widget.lock().unwrap().event(event::read()?);
                             }
                             anyhow::Ok(())
                         });
+                    }
+                    terminal.autoresize()?;
+                    let layout_area = widget_layout.layout.split(terminal.get_frame().size());
+                    for widget in &widget_layout.widgets {
                         widget.component.lock().unwrap().render(
                             &mut terminal.get_frame(),
                             layout_area[widget.layout_area_index],
