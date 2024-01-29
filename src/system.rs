@@ -105,13 +105,13 @@ impl System {
                     terminal.autoresize()?;
                     let layout_area = widget_layout.layout.split(terminal.get_frame().size());
                     for widget in &widget_layout.widgets {
-                        if event::poll(time::Duration::from_millis(0))? {
-                            let widget = widget.component.clone();
-                            tokio::spawn(async move {
-                                widget.lock().unwrap().event(event::read()?);
-                                anyhow::Ok(())
-                            });
-                        }
+                        let widget_async = widget.component.clone();
+                        tokio::spawn(async move {
+                            if event::poll(time::Duration::from_millis(0))? {
+                                widget_async.lock().unwrap().event(event::read()?);
+                            }
+                            anyhow::Ok(())
+                        });
                         widget.component.lock().unwrap().render(
                             &mut terminal.get_frame(),
                             layout_area[widget.layout_area_index],
