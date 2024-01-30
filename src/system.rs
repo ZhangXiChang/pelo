@@ -12,7 +12,7 @@ use crossterm::{
     ExecutableCommand,
 };
 use ratatui::{
-    backend::{Backend, CrosstermBackend},
+    backend::CrosstermBackend,
     layout::{Layout, Rect},
     Frame, Terminal,
 };
@@ -111,18 +111,16 @@ impl System {
                             anyhow::Ok(())
                         });
                     }
-                    terminal.autoresize()?;
-                    let layout_area = widget_layout.layout.split(terminal.get_frame().size());
-                    for widget in &widget_layout.widgets {
-                        widget.component.lock().unwrap().render(
-                            &mut terminal.get_frame(),
-                            layout_area[widget.layout_area_index],
-                        );
-                    }
-                    terminal.flush()?;
-                    terminal.hide_cursor()?;
-                    terminal.swap_buffers();
-                    terminal.backend_mut().flush()?;
+                    terminal.draw(|frame| {
+                        let layout_area = widget_layout.layout.split(frame.size());
+                        for widget in &widget_layout.widgets {
+                            widget
+                                .component
+                                .lock()
+                                .unwrap()
+                                .render(frame, layout_area[widget.layout_area_index]);
+                        }
+                    })?;
                 }
             }
         }
@@ -132,5 +130,13 @@ impl System {
     }
     pub fn quit(&mut self) {
         self.is_run = false;
+    }
+    pub fn query_widget_layout(&mut self) -> Option<Arc<Mutex<Box<dyn SystemComponent>>>> {
+        for component in &self.components {
+            if let Some(_) = component.lock().unwrap().as_widget_layout() {
+                return Some(component.clone());
+            }
+        }
+        None
     }
 }

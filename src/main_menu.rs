@@ -6,7 +6,7 @@ use std::{
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude::*, widgets::*};
 
-use crate::system::*;
+use crate::{system::*, SideMenu};
 
 pub struct MainMenu {
     title: String,
@@ -61,23 +61,27 @@ impl WidgetComponent for MainMenu {
                         if let Some(selected) = self.items_state.selected() {
                             match selected {
                                 0 => {
-                                    // if let Some(side_menu) = self
-                                    //     .system
-                                    //     .as_ref()
-                                    //     .unwrap()
-                                    //     .lock()
-                                    //     .unwrap()
-                                    //     .query_by_index(1)
-                                    //     .unwrap()
-                                    //     .lock()
-                                    //     .unwrap()
-                                    //     .public()
-                                    //     .unwrap()
-                                    //     .downcast_mut::<SideMenu>()
-                                    // {
-                                    //     side_menu.items =
-                                    //         vec!["你好".to_string(), "世界".to_string()];
-                                    // }
+                                    if let Some(system) = &self.system {
+                                        if let Some(query) =
+                                            system.lock().unwrap().query_widget_layout()
+                                        {
+                                            if let Some(widget_layout) =
+                                                query.lock().unwrap().as_widget_layout()
+                                            {
+                                                if let Some(widget) = widget_layout.widgets[1]
+                                                    .component
+                                                    .lock()
+                                                    .unwrap()
+                                                    .public()
+                                                {
+                                                    if let Some(_side_main) =
+                                                        widget.downcast_mut::<SideMenu>()
+                                                    {
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                                 1 => self.system.as_ref().unwrap().lock().unwrap().quit(),
                                 _ => (),
