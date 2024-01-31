@@ -18,7 +18,7 @@ use ratatui::{
 };
 
 pub trait SystemComponent: Send {
-    fn as_widget_layout(&mut self) -> Option<&mut WidgetLayout> {
+    fn as_widget_layout(&self) -> Option<&WidgetLayout> {
         None
     }
 }
@@ -52,7 +52,7 @@ pub struct WidgetLayout {
     pub sub_layout: Option<Vec<Box<WidgetLayout>>>,
 }
 impl SystemComponent for WidgetLayout {
-    fn as_widget_layout(&mut self) -> Option<&mut WidgetLayout> {
+    fn as_widget_layout(&self) -> Option<&WidgetLayout> {
         Some(self)
     }
 }
@@ -88,7 +88,7 @@ impl System {
         {
             components = system.lock().unwrap().components.clone();
         }
-        for component in &mut components {
+        for component in &components {
             if let Some(widget_layout) = component.lock().unwrap().as_widget_layout() {
                 for widget in &widget_layout.widgets {
                     widget
@@ -100,26 +100,10 @@ impl System {
             }
         }
         while system.lock().unwrap().is_run {
-            for component in &mut components {
+            for component in &components {
                 if let Some(widget_layout) = component.lock().unwrap().as_widget_layout() {
-                    for widget in &widget_layout.widgets {
-                        let widget = widget.component.clone();
-                        tokio::spawn(async move {
-                            if event::poll(time::Duration::from_millis(0))? {
-                                widget.lock().unwrap().event(event::read()?);
-                            }
-                            anyhow::Ok(())
-                        });
-                    }
                     terminal.draw(|frame| {
-                        let layout_area = widget_layout.layout.split(frame.size());
-                        for widget in &widget_layout.widgets {
-                            widget
-                                .component
-                                .lock()
-                                .unwrap()
-                                .render(frame, layout_area[widget.layout_area_index]);
-                        }
+                        Self::draw_widgets(frame, widget_layout, frame.size());
                     })?;
                 }
             }
@@ -138,5 +122,24 @@ impl System {
             }
         }
         None
+    }
+    fn draw_widgets(frame: &mut Frame, widget_layout: &WidgetLayout, super_area: Rect) {
+        for widget in &widget_layout.widgets {
+            let widget = widget.component.clone();
+            tokio::spawn(async move {
+                if event::poll(time::Duration::from_millis(0))? {
+                    widget.lock().unwrap().event(event::read()?);
+                }
+                anyhow::Ok(())
+            });
+        }
+        let layout_area = widget_layout.layout.split(frame.size());
+        for widget in &widget_layout.widgets {
+            widget
+                .component
+                .lock()
+                .unwrap()
+                .render(frame, layout_area[widget.layout_area_index]);
+        }
     }
 }
