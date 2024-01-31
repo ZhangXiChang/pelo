@@ -49,7 +49,7 @@ pub struct WidgetLayout {
     pub layout: Layout,
     pub widgets: Vec<Widget>,
     pub super_layout_area_index: usize,
-    pub sub_layout: Option<Vec<Box<WidgetLayout>>>,
+    pub sub_layout: Vec<Box<WidgetLayout>>,
 }
 impl SystemComponent for WidgetLayout {
     fn as_widget_layout(&self) -> Option<&WidgetLayout> {
@@ -110,8 +110,12 @@ impl System {
         while system.lock().unwrap().is_run {
             if let Some(widget_component) = widget_component {
                 if let Some(widget_layout) = widget_component.lock().unwrap().as_widget_layout() {
+                    let mut event = None;
+                    if event::poll(time::Duration::from_millis(0))? {
+                        event = Some(event::read()?);
+                    }
                     terminal.as_mut().unwrap().draw(|frame| {
-                        Self::draw_widgets(frame, widget_layout, frame.size());
+                        Self::draw_widgets(event, frame, widget_layout, frame.size());
                     });
                 }
             }
@@ -133,23 +137,37 @@ impl System {
         }
         None
     }
-    fn draw_widgets(frame: &mut Frame, widget_layout: &WidgetLayout, super_area: Rect) {
+    fn draw_widgets(
+        event: Option<Event>,
+        frame: &mut Frame,
+        widget_layout: &WidgetLayout,
+        super_area: Rect,
+    ) {
         for widget in &widget_layout.widgets {
-            let widget = widget.component.clone();
+            let event = event.clone();
+            let widget_component = widget.component.clone();
             tokio::spawn(async move {
-                if event::poll(time::Duration::from_millis(0))? {
-                    widget.lock().unwrap().event(event::read()?);
+                if let Some(event) = event {
+                    widget_component.lock().unwrap().event(event);
                 }
                 anyhow::Ok(())
             });
         }
-        let layout_area = widget_layout.layout.split(frame.size());
+        let layout_area = widget_layout.layout.split(super_area);
         for widget in &widget_layout.widgets {
             widget
                 .component
                 .lock()
                 .unwrap()
                 .render(frame, layout_area[widget.layout_area_index]);
+        }
+        for widget_layout in &widget_layout.sub_layout {
+            Self::draw_widgets(
+                event.clone(),
+                frame,
+                widget_layout,
+                layout_area[widget_layout.super_layout_area_index],
+            );
         }
     }
 }

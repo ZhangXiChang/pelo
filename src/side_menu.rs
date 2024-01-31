@@ -10,10 +10,11 @@ use crate::system::*;
 
 pub struct SideMenu {
     title: String,
-    title_style: Modifier,
-    items: Vec<String>,
-    items_state: ListState,
+    pub title_style: Modifier,
+    pub items: Vec<String>,
+    pub items_state: ListState,
     system: Option<Arc<Mutex<System>>>,
+    pub focus: bool,
 }
 impl SideMenu {
     pub fn new() -> Self {
@@ -23,6 +24,7 @@ impl SideMenu {
             items: vec![],
             items_state: ListState::default(),
             system: None,
+            focus: false,
         }
     }
     fn select_last_item(&mut self) {
@@ -48,23 +50,26 @@ impl WidgetComponent for SideMenu {
         self.system = Some(system);
     }
     fn event(&mut self, event: Event) {
-        match event {
-            Event::Key(key) => match key.kind {
-                KeyEventKind::Press => match key.code {
-                    KeyCode::Up => self.select_last_item(),
-                    KeyCode::Down => self.select_next_item(),
-                    KeyCode::Enter => {
-                        if let Some(selected) = self.items_state.selected() {
-                            match selected {
-                                _ => (),
+        if self.focus {
+            match event {
+                Event::Key(key) => match key.kind {
+                    KeyEventKind::Press => match key.code {
+                        KeyCode::Up => self.select_last_item(),
+                        KeyCode::Down => self.select_next_item(),
+                        KeyCode::Esc => (),
+                        KeyCode::Enter => {
+                            if let Some(selected) = self.items_state.selected() {
+                                match selected {
+                                    _ => (),
+                                }
                             }
                         }
-                    }
+                        _ => (),
+                    },
                     _ => (),
                 },
                 _ => (),
-            },
-            _ => (),
+            }
         }
     }
     fn render(&mut self, frame: &mut Frame, area: Rect) {

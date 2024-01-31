@@ -14,6 +14,7 @@ pub struct MainMenu {
     items: Vec<String>,
     items_state: ListState,
     system: Option<Arc<Mutex<System>>>,
+    focus: bool,
 }
 impl MainMenu {
     pub fn new() -> Self {
@@ -27,6 +28,7 @@ impl MainMenu {
                 list_state
             },
             system: None,
+            focus: true,
         }
     }
     fn select_last_item(&mut self) {
@@ -52,47 +54,59 @@ impl WidgetComponent for MainMenu {
         self.system = Some(system);
     }
     fn event(&mut self, event: Event) {
-        match event {
-            Event::Key(key) => match key.kind {
-                KeyEventKind::Press => match key.code {
-                    KeyCode::Up => self.select_last_item(),
-                    KeyCode::Down => self.select_next_item(),
-                    KeyCode::Enter => {
-                        if let Some(selected) = self.items_state.selected() {
-                            match selected {
-                                0 => {
-                                    if let Some(system) = &self.system {
-                                        if let Some(query) =
-                                            system.lock().unwrap().query_widget_layout()
+        if self.focus {
+            match event {
+                Event::Key(key) => match key.kind {
+                    KeyEventKind::Press => match key.code {
+                        KeyCode::Up => self.select_last_item(),
+                        KeyCode::Down => self.select_next_item(),
+                        KeyCode::Enter => {
+                            if let Some(selected) = self.items_state.selected() {
+                                match selected {
+                                    0 => {
+                                        self.focus = false;
+                                        self.title_style.remove(Modifier::REVERSED);
+                                        if let Some(side_main) = self
+                                            .system
+                                            .as_ref()
+                                            .unwrap()
+                                            .lock()
+                                            .unwrap()
+                                            .query_widget_layout()
+                                            .unwrap()
+                                            .lock()
+                                            .unwrap()
+                                            .as_widget_layout()
+                                            .unwrap()
+                                            .widgets[1]
+                                            .component
+                                            .lock()
+                                            .unwrap()
+                                            .public()
+                                            .unwrap()
+                                            .downcast_mut::<SideMenu>()
                                         {
-                                            if let Some(widget_layout) =
-                                                query.lock().unwrap().as_widget_layout()
-                                            {
-                                                if let Some(widget) = widget_layout.widgets[1]
-                                                    .component
-                                                    .lock()
-                                                    .unwrap()
-                                                    .public()
-                                                {
-                                                    if let Some(_side_main) =
-                                                        widget.downcast_mut::<SideMenu>()
-                                                    {
-                                                    }
-                                                }
-                                            }
+                                            side_main.items = vec![
+                                                "第一".to_string(),
+                                                "第二".to_string(),
+                                                "第三".to_string(),
+                                            ];
+                                            side_main.items_state.select(Some(0));
+                                            side_main.title_style |= Modifier::REVERSED;
+                                            side_main.focus = true;
                                         }
                                     }
+                                    1 => self.system.as_ref().unwrap().lock().unwrap().quit(),
+                                    _ => (),
                                 }
-                                1 => self.system.as_ref().unwrap().lock().unwrap().quit(),
-                                _ => (),
                             }
                         }
-                    }
+                        _ => (),
+                    },
                     _ => (),
                 },
                 _ => (),
-            },
-            _ => (),
+            }
         }
     }
     fn render(&mut self, frame: &mut Frame, area: Rect) {
