@@ -81,12 +81,20 @@ impl System {
     }
     pub fn run(self) -> Result<()> {
         let system = Arc::new(Mutex::new(self));
-        io::stdout().execute(EnterAlternateScreen)?;
-        enable_raw_mode()?;
-        let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
         let mut components;
         {
             components = system.lock().unwrap().components.clone();
+        }
+        let mut widget_component = None;
+        let mut terminal = None;
+        for component in &components {
+            if let Some(_) = component.lock().unwrap().as_widget_layout() {
+                widget_component = Some(component);
+                io::stdout().execute(EnterAlternateScreen)?;
+                enable_raw_mode()?;
+                terminal = Some(Terminal::new(CrosstermBackend::new(io::stdout()))?);
+                break;
+            }
         }
         for component in &components {
             if let Some(widget_layout) = component.lock().unwrap().as_widget_layout() {
@@ -100,16 +108,18 @@ impl System {
             }
         }
         while system.lock().unwrap().is_run {
-            for component in &components {
-                if let Some(widget_layout) = component.lock().unwrap().as_widget_layout() {
-                    terminal.draw(|frame| {
+            if let Some(widget_component) = widget_component {
+                if let Some(widget_layout) = widget_component.lock().unwrap().as_widget_layout() {
+                    terminal.as_mut().unwrap().draw(|frame| {
                         Self::draw_widgets(frame, widget_layout, frame.size());
-                    })?;
+                    });
                 }
             }
         }
-        disable_raw_mode()?;
-        io::stdout().execute(LeaveAlternateScreen)?;
+        if let Some(_) = terminal {
+            disable_raw_mode()?;
+            io::stdout().execute(LeaveAlternateScreen)?;
+        }
         Ok(())
     }
     pub fn quit(&mut self) {
