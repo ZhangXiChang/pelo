@@ -78,6 +78,7 @@ impl WidgetComponent for MainMenu {
                                             .unwrap()
                                             .as_widget_layout()
                                             .unwrap()
+                                            .sub_layout[0]
                                             .widgets[1]
                                             .component
                                             .lock()

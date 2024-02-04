@@ -91,13 +91,7 @@ impl System {
                 io::stdout().execute(EnterAlternateScreen)?;
                 enable_raw_mode()?;
                 terminal = Some(Terminal::new(CrosstermBackend::new(io::stdout()))?);
-                for widget in &widget_layout.widgets {
-                    widget
-                        .component
-                        .lock()
-                        .unwrap()
-                        .register_system(system.clone());
-                }
+                Self::register_widgets_system(widget_layout, &system);
             }
         }
         while system.lock().unwrap().is_run {
@@ -129,6 +123,18 @@ impl System {
             }
         }
         None
+    }
+    fn register_widgets_system(widget_layout: &WidgetLayout, system: &Arc<Mutex<Self>>) {
+        for widget in &widget_layout.widgets {
+            widget
+                .component
+                .lock()
+                .unwrap()
+                .register_system(system.clone());
+        }
+        for widget_layout in &widget_layout.sub_layout {
+            Self::register_widgets_system(widget_layout, system);
+        }
     }
     fn draw_widgets(
         event: &Option<Event>,
