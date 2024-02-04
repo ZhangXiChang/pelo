@@ -28,7 +28,9 @@ pub trait WidgetComponent: Send {
         None
     }
     fn register_system(&mut self, system: Arc<Mutex<System>>) {}
-    fn event(&mut self, event: &Event) {}
+    fn event(&mut self, event: &Event) -> Result<()> {
+        Ok(())
+    }
     fn render(&mut self, frame: &mut Frame, area: Rect) {}
 }
 

@@ -1,8 +1,10 @@
 use std::{
     any::Any,
+    fs,
     sync::{Arc, Mutex},
 };
 
+use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude::*, widgets::*};
 
@@ -21,7 +23,7 @@ impl MainMenu {
         Self {
             title: "主菜单".to_string(),
             title_style: Modifier::REVERSED,
-            items: vec!["开始".to_string(), "结束".to_string()],
+            items: vec!["让我康康你的卡组".to_string(), "退出牌佬助手".to_string()],
             items_state: {
                 let mut list_state = ListState::default();
                 list_state.select(Some(0));
@@ -53,7 +55,7 @@ impl WidgetComponent for MainMenu {
     fn register_system(&mut self, system: Arc<Mutex<System>>) {
         self.system = Some(system);
     }
-    fn event(&mut self, event: &Event) {
+    fn event(&mut self, event: &Event) -> Result<()> {
         if self.focus {
             match event {
                 Event::Key(key) => match key.kind {
@@ -87,11 +89,22 @@ impl WidgetComponent for MainMenu {
                                             .unwrap()
                                             .downcast_mut::<SideMenu>()
                                         {
-                                            side_main.items = vec![
-                                                "返回".to_string(),
-                                                "第二".to_string(),
-                                                "第三".to_string(),
-                                            ];
+                                            let mut file_name_list = vec![];
+                                            for dir_entry_result in fs::read_dir("./assets/deck/")?
+                                            {
+                                                let dir_entry = dir_entry_result?;
+                                                if fs::metadata(dir_entry.path())?.is_file() {
+                                                    if let Some(file_name) =
+                                                        dir_entry.file_name().to_str()
+                                                    {
+                                                        if let Some(i) = file_name.rfind(".ydk") {
+                                                            file_name_list
+                                                                .push(file_name[0..i].to_string());
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            side_main.items = file_name_list;
                                             side_main.items_state.select(Some(0));
                                             side_main.title_style |= Modifier::REVERSED;
                                             side_main.focus = true;
@@ -109,6 +122,7 @@ impl WidgetComponent for MainMenu {
                 _ => (),
             }
         }
+        Ok(())
     }
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         frame.render_stateful_widget(

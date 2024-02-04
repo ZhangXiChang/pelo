@@ -3,6 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude::*, widgets::*};
 
@@ -49,7 +50,7 @@ impl WidgetComponent for SideMenu {
     fn register_system(&mut self, system: Arc<Mutex<System>>) {
         self.system = Some(system);
     }
-    fn event(&mut self, event: &Event) {
+    fn event(&mut self, event: &Event) -> Result<()> {
         if self.focus {
             match event {
                 Event::Key(key) => match key.kind {
@@ -59,6 +60,8 @@ impl WidgetComponent for SideMenu {
                         KeyCode::Esc => {
                             self.focus = false;
                             self.title_style.remove(Modifier::REVERSED);
+                            self.items = vec![];
+                            self.items_state.select(None);
                             if let Some(main_menu) = self
                                 .system
                                 .as_ref()
@@ -98,6 +101,7 @@ impl WidgetComponent for SideMenu {
                 _ => (),
             }
         }
+        Ok(())
     }
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         frame.render_stateful_widget(
