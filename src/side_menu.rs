@@ -49,7 +49,7 @@ impl WidgetComponent for SideMenu {
     fn register_system(&mut self, system: Arc<Mutex<System>>) {
         self.system = Some(system);
     }
-    fn event(&mut self, event: Event) {
+    fn event(&mut self, event: &Event) {
         if self.focus {
             match event {
                 Event::Key(key) => match key.kind {

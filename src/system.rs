@@ -28,7 +28,7 @@ pub trait WidgetComponent: Send {
         None
     }
     fn register_system(&mut self, system: Arc<Mutex<System>>) {}
-    fn event(&mut self, event: Event) {}
+    fn event(&mut self, event: &Event) {}
     fn render(&mut self, frame: &mut Frame, area: Rect) {}
 }
 
@@ -85,19 +85,12 @@ impl System {
         {
             components = system.lock().unwrap().components.clone();
         }
-        let mut widget_component = None;
         let mut terminal = None;
         for component in &components {
-            if let Some(_) = component.lock().unwrap().as_widget_layout() {
-                widget_component = Some(component);
+            if let Some(widget_layout) = component.lock().unwrap().as_widget_layout() {
                 io::stdout().execute(EnterAlternateScreen)?;
                 enable_raw_mode()?;
                 terminal = Some(Terminal::new(CrosstermBackend::new(io::stdout()))?);
-                break;
-            }
-        }
-        for component in &components {
-            if let Some(widget_layout) = component.lock().unwrap().as_widget_layout() {
                 for widget in &widget_layout.widgets {
                     widget
                         .component
@@ -108,19 +101,19 @@ impl System {
             }
         }
         while system.lock().unwrap().is_run {
-            if let Some(widget_component) = widget_component {
-                if let Some(widget_layout) = widget_component.lock().unwrap().as_widget_layout() {
+            for component in &components {
+                if let Some(widget_layout) = component.lock().unwrap().as_widget_layout() {
                     let mut event = None;
                     if event::poll(time::Duration::from_millis(0))? {
                         event = Some(event::read()?);
                     }
                     terminal.as_mut().unwrap().draw(|frame| {
-                        Self::draw_widgets(event, frame, widget_layout, frame.size());
+                        Self::draw_widgets(&event, frame, widget_layout, frame.size());
                     });
                 }
             }
         }
-        if let Some(_) = terminal {
+        if terminal.is_some() {
             disable_raw_mode()?;
             io::stdout().execute(LeaveAlternateScreen)?;
         }
@@ -131,30 +124,28 @@ impl System {
     }
     pub fn query_widget_layout(&mut self) -> Option<Arc<Mutex<Box<dyn SystemComponent>>>> {
         for component in &self.components {
-            if let Some(_) = component.lock().unwrap().as_widget_layout() {
+            if component.lock().unwrap().as_widget_layout().is_some() {
                 return Some(component.clone());
             }
         }
         None
     }
     fn draw_widgets(
-        event: Option<Event>,
+        event: &Option<Event>,
         frame: &mut Frame,
         widget_layout: &WidgetLayout,
         super_area: Rect,
     ) {
+        let layout_area = widget_layout.layout.split(super_area);
         for widget in &widget_layout.widgets {
             let event = event.clone();
             let widget_component = widget.component.clone();
             tokio::spawn(async move {
                 if let Some(event) = event {
-                    widget_component.lock().unwrap().event(event);
+                    widget_component.lock().unwrap().event(&event);
                 }
                 anyhow::Ok(())
             });
-        }
-        let layout_area = widget_layout.layout.split(super_area);
-        for widget in &widget_layout.widgets {
             widget
                 .component
                 .lock()
@@ -163,7 +154,7 @@ impl System {
         }
         for widget_layout in &widget_layout.sub_layout {
             Self::draw_widgets(
-                event.clone(),
+                event,
                 frame,
                 widget_layout,
                 layout_area[widget_layout.super_layout_area_index],
