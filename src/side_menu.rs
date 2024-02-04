@@ -6,7 +6,7 @@ use std::{
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude::*, widgets::*};
 
-use crate::system::*;
+use crate::{system::*, MainMenu};
 
 pub struct SideMenu {
     title: String,
@@ -56,7 +56,34 @@ impl WidgetComponent for SideMenu {
                     KeyEventKind::Press => match key.code {
                         KeyCode::Up => self.select_last_item(),
                         KeyCode::Down => self.select_next_item(),
-                        KeyCode::Esc => (),
+                        KeyCode::Esc => {
+                            self.focus = false;
+                            self.title_style.remove(Modifier::REVERSED);
+                            if let Some(main_menu) = self
+                                .system
+                                .as_ref()
+                                .unwrap()
+                                .lock()
+                                .unwrap()
+                                .query_widget_layout()
+                                .unwrap()
+                                .lock()
+                                .unwrap()
+                                .as_widget_layout()
+                                .unwrap()
+                                .sub_layout[0]
+                                .widgets[0]
+                                .component
+                                .lock()
+                                .unwrap()
+                                .public()
+                                .unwrap()
+                                .downcast_mut::<MainMenu>()
+                            {
+                                main_menu.title_style |= Modifier::REVERSED;
+                                main_menu.focus = true;
+                            }
+                        }
                         KeyCode::Enter => {
                             if let Some(selected) = self.items_state.selected() {
                                 match selected {

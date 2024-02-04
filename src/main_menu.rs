@@ -10,11 +10,11 @@ use crate::{system::*, SideMenu};
 
 pub struct MainMenu {
     title: String,
-    title_style: Modifier,
+    pub title_style: Modifier,
     items: Vec<String>,
     items_state: ListState,
     system: Option<Arc<Mutex<System>>>,
-    focus: bool,
+    pub focus: bool,
 }
 impl MainMenu {
     pub fn new() -> Self {
@@ -88,7 +88,7 @@ impl WidgetComponent for MainMenu {
                                             .downcast_mut::<SideMenu>()
                                         {
                                             side_main.items = vec![
-                                                "第一".to_string(),
+                                                "返回".to_string(),
                                                 "第二".to_string(),
                                                 "第三".to_string(),
                                             ];
