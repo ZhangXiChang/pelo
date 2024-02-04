@@ -5,9 +5,9 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.79"                                   #错误处理
-tokio = { version = "1.35.1", features = ["full"] } #异步运行时
+tokio = { version = "1.36.0", features = ["full"] } #异步运行时
 crossterm = "0.27.0"                                #终端控制
-ratatui = "0.25.0"                                  #终端绘制
-reqwest = "0.11.23"                                 #HTTP请求
-regex = "1.10.2"                                    #正则表达式
+ratatui = "0.26.0"                                  #终端绘制
+reqwest = "0.11.24"                                 #HTTP请求
+regex = "1.10.3"                                    #正则表达式
 image = "0.24.8"                                    #图像处理
